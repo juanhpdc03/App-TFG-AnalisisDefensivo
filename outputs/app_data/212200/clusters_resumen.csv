@@ -1,0 +1,5 @@
+﻿cluster_trayectoria,secuencias,tiros,tiros_puerta,duracion_media,porcentaje,tiro_pct,zona_dominante,carril_dominante,etiqueta_tactica
+0,17,2,0,9.3,27.4,11.8,zona_2,carril_4,zona_2_carril_4_retroceso_amenaza_media
+1,24,4,2,8.1,38.7,16.7,zona_3,carril_2,zona_3_carril_2_progresion_vertical_amenaza_centro
+2,11,2,1,9.1,17.7,18.2,zona_3,carril_4,zona_3_carril_4_circulacion_amenaza_media
+3,10,0,0,10.4,16.1,0.0,zona_2,carril_2,zona_2_carril_2_circulacion_amenaza_media

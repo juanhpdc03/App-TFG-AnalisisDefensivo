@@ -1,0 +1,10 @@
+numpy
+pandas
+requests
+scikit-learn
+matplotlib
+seaborn
+scipy
+plotly
+streamlit
+streamlit-plotly-events

@@ -1,0 +1,41 @@
+"""Graficos reutilizables para dashboard e informes."""
+
+from .dashboard import (
+    crear_dashboard_completo,
+    plot_causas_danio,
+    plot_evolucion_temporal,
+    plot_evolucion_temporal_con_tiros,
+    plot_heatmap_territorial_clusters,
+    plot_kpis_partido,
+    plot_matriz_5x5_ddi_ipar,
+    plot_matriz_ddi_ipar,
+    plot_ranking_secuencias,
+    plot_trayectorias_por_cluster,
+    plot_zona_cluster_danio,
+    tabla_causas_danio,
+    tabla_kpis_partido,
+    tabla_matriz_5x5,
+    tabla_perfiles_extremos,
+    tabla_ranking_secuencias,
+    tabla_zona_cluster_danio,
+)
+
+__all__ = [
+    "crear_dashboard_completo",
+    "plot_kpis_partido",
+    "plot_matriz_ddi_ipar",
+    "plot_matriz_5x5_ddi_ipar",
+    "plot_evolucion_temporal",
+    "plot_evolucion_temporal_con_tiros",
+    "plot_trayectorias_por_cluster",
+    "plot_heatmap_territorial_clusters",
+    "plot_ranking_secuencias",
+    "plot_causas_danio",
+    "plot_zona_cluster_danio",
+    "tabla_kpis_partido",
+    "tabla_matriz_5x5",
+    "tabla_ranking_secuencias",
+    "tabla_perfiles_extremos",
+    "tabla_causas_danio",
+    "tabla_zona_cluster_danio",
+]

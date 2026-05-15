@@ -1,0 +1,3 @@
+﻿secuencia_rival_id,cluster_trayectoria,indice_desorganizacion,indice_peligrosidad_accion,tipo_desorganizacion_principal,tipo_finalizacion_tiro,tipo_finalizacion_tiro_puerta
+67,2.0,0.502,0.946,estructura_retroceso,1,0
+89,2.0,0.519,0.863,estructura_retroceso,1,1

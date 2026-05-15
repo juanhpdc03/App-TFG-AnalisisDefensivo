@@ -1,0 +1,51 @@
+{
+  "match_id": 209425,
+  "team_id": 12987,
+  "team_name": "CD Subiza",
+  "rival_team_id": 7608,
+  "rival_name": "C.D. Izarra",
+  "rival_initials": "CI",
+  "resumen": {
+    "match_id": 209425,
+    "team_id": 12987,
+    "rival_team_id": 7608,
+    "n_tracking_raw": 3039975,
+    "n_tracking_250ms": 486442,
+    "n_eventing_raw": 7269,
+    "n_secuencias_detectadas": 46,
+    "n_secuencias_rivales": 45,
+    "n_secuencias_clusterizadas": 45,
+    "n_tipologias_detectadas": 4,
+    "cluster_scope": "global",
+    "n_clusters_modelo": 4,
+    "tiros_rival": 10,
+    "tiros_puerta_rival": 6,
+    "tiros_rival_asignados_secuencia": 6
+  },
+  "figures": {
+    "matriz_ddi_ipar": "matriz_ddi_ipar.png",
+    "matriz_5x5": "matriz_5x5.png",
+    "evolucion_temporal": "evolucion_temporal.png",
+    "evolucion_temporal_tiros": "evolucion_temporal_tiros.png",
+    "trayectorias_cluster": "trayectorias_cluster.png",
+    "mapa_calor_notebook": "mapa_calor_clusters.png",
+    "amenaza_media_cluster": "amenaza_media_cluster.png",
+    "ranking_secuencias": "ranking_secuencias.png",
+    "causas_danio": "causas_danio.png",
+    "zona_cluster_danio": "zona_cluster_danio.png"
+  },
+  "tables": {
+    "kpis": "kpis.csv",
+    "clusters_resumen": "clusters_resumen.csv",
+    "riesgo_resumen": "riesgo_resumen.csv",
+    "ranking_secuencias": "ranking_secuencias.csv",
+    "secuencias_detalle": "secuencias_detalle.csv",
+    "matriz_5x5": "matriz_5x5.csv",
+    "causas_danio": "causas_danio.csv",
+    "zona_cluster_danio": "zona_cluster_danio.csv",
+    "danio_sin_desorden_simple": "danio_sin_desorden.csv",
+    "caos_sin_castigo_simple": "caos_sin_castigo.csv",
+    "trayectorias_ligeras": "trayectorias_ligeras.csv",
+    "amenaza_media_cluster": "amenaza_media_cluster.csv"
+  }
+}

@@ -1,0 +1,20 @@
+[project]
+name = "tfg-analysis"
+version = "0.1.0"
+description = "Pipeline escalable para analisis tactico defensivo con tracking y eventing Bepro."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "pandas",
+    "requests",
+    "scikit-learn",
+    "matplotlib",
+    "seaborn",
+    "scipy",
+    "plotly",
+    "streamlit",
+    "streamlit-plotly-events",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

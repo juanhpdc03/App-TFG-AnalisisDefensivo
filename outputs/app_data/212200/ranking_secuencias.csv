@@ -1,0 +1,16 @@
+﻿secuencia_rival_id,cluster_trayectoria,indice_peligrosidad_accion,indice_desorganizacion,categoria_peligrosidad_auto,categoria_desorganizacion_auto,tipo_desorganizacion_principal,score_finalizacion,tipo_finalizacion_tiro,tipo_finalizacion_tiro_puerta
+2,1,1.0,0.5585972401172918,critica,media,pitch_control_rival,0.489,1,1
+23,2,1.0,0.5568644069789626,critica,media,pitch_control_rival,0.615,1,0
+31,1,0.9156363700271007,0.5068767382001765,muy_alta,media,pitch_control_rival,0.307,1,0
+38,2,0.9144202624335381,0.7279119023285416,muy_alta,muy_alta,estructura_retroceso,0.398,1,1
+48,0,0.8711764980424647,0.5709755765997541,muy_alta,media,estructura_retroceso,0.398,1,0
+4,1,0.8599519712538479,0.48071646058338,muy_alta,baja,pitch_control_rival,0.33499999999999996,1,0
+33,1,0.7940626494539279,0.6816735207541376,muy_alta,muy_alta,pitch_control_rival,0.3,0,0
+9,1,0.7361472990101185,0.4567931295981219,alta,baja,estructura_retroceso,0.314,1,1
+12,1,0.7338263374187952,0.5477914766700871,alta,media,pitch_control_rival,0.3,0,0
+15,1,0.6794459042349741,0.5053707253711924,alta,media,estructura_anchura,0.3,0,0
+3,1,0.647478380268137,0.49959561543983366,alta,media,pitch_control_rival,0.3,0,0
+37,1,0.6471533296833053,0.6270489879431036,alta,alta,estructura_retroceso,0.3,0,0
+1,1,0.6181482207573001,0.5370961997877259,alta,media,estructura_anchura,0.3,0,0
+40,1,0.593634299177464,0.6582322867585157,alta,alta,pitch_control_rival,0.1,0,0
+61,1,0.5755228806851594,0.5154270378470927,alta,media,pitch_control_rival,0.1,0,0

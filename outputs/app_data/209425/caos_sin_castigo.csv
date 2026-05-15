@@ -1,0 +1,5 @@
+﻿secuencia_rival_id,cluster_trayectoria,indice_desorganizacion,indice_peligrosidad_accion,tipo_desorganizacion_principal,tipo_finalizacion_tiro,tipo_finalizacion_tiro_puerta
+4,2.0,0.628,0.192,estructura_retroceso,0,0
+5,2.0,0.691,0.242,estructura_anchura,0,0
+15,0.0,0.657,0.241,pitch_control_rival,0,0
+30,0.0,0.8,0.241,pitch_control_rival,0,0
