@@ -36,8 +36,6 @@ from tfg_analysis.app_data import listar_app_data_disponible
 from tfg_analysis.config import FIELD_LENGTH_M, FIELD_WIDTH_M, ProjectPaths
 from tfg_analysis.features.threat import _asignar_celda_xt, _crear_xt_grid
 from tfg_analysis.interpretability import (
-    INDEX_LEVELS,
-    INDEX_NAMES,
     build_interpretability_reference,
     classify_index_value,
     xthreat_reference_text,
@@ -125,7 +123,35 @@ def _paths() -> ProjectPaths:
 
 @st.cache_data(show_spinner=False)
 def _interpretability_reference() -> dict:
-    return build_interpretability_reference(str(_paths().outputs_dir / "app_data"))
+    app_data_dir = _paths().outputs_dir / "app_data"
+    frames: list[pd.DataFrame] = []
+    available = listar_app_data_disponible(app_data_dir)
+    if not available.empty and "match_id" in available.columns:
+        for match_id in available["match_id"].dropna().astype(int).tolist():
+            match_dir = app_data_dir / str(int(match_id))
+            for filename in ("secuencias_detalle.csv", "ranking_secuencias.csv"):
+                path = match_dir / filename
+                if path.exists():
+                    try:
+                        frames.append(pd.read_csv(path))
+                    except (OSError, EmptyDataError):
+                        pass
+                    break
+    sequences = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    reference = build_interpretability_reference(sequences)
+    reference["thresholds"] = {
+        metric: data.get("thresholds", {}) for metric, data in reference.items() if isinstance(data, dict)
+    }
+    reference["counts"] = {
+        metric: {
+            str(level.get("label", "")): int(count)
+            for level, count in zip(data.get("levels", []), data.get("counts", []))
+        }
+        for metric, data in reference.items()
+        if isinstance(data, dict) and "levels" in data
+    }
+    reference["n_sequences"] = int(len(sequences))
+    return reference
 
 
 def inject_style():
@@ -737,7 +763,7 @@ def inject_style():
             border: 4px solid var(--osasuna-red);
             overflow: hidden;
             box-sizing: border-box;
-            padding: 7px;
+            padding: 9px;
             box-shadow: 0 10px 24px rgba(0,0,0,0.18);
         }
         .sidebar-crest img {
@@ -904,9 +930,13 @@ def inject_style():
             border-top-color: #2453a6;
         }
         .team-card .team-card-logo .sidebar-crest {
-            width: 74px;
-            height: 74px;
+            width: 72px;
+            height: 72px;
             margin: 0;
+            padding: 8px;
+        }
+        .team-card strong {
+            font-size: 1.18rem !important;
         }
         .team-pill {
             display: inline-flex;
@@ -934,13 +964,14 @@ def inject_style():
                 linear-gradient(135deg, rgba(10,16,32,0.96), rgba(36,83,166,0.34) 48%, rgba(200,16,46,0.24));
         }
         .club-home-card .sidebar-crest {
-            width: 98px;
-            height: 98px;
+            width: 94px;
+            height: 94px;
             margin: 0;
+            padding: 10px;
         }
         .club-home-card h1 {
             color: #ffffff !important;
-            font-size: 2rem;
+            font-size: 2.35rem;
             line-height: 1.08;
             margin: 0;
             text-transform: none;
@@ -1142,15 +1173,19 @@ def inject_style():
             line-height: 1.25;
         }
         .metric-badge {
-            display: inline-flex;
+            display: inline-grid;
+            grid-template-columns: 12px minmax(0, 1fr);
             align-items: center;
             gap: 7px;
             min-width: 0;
             max-width: 100%;
             color: #ffffff !important;
             font-weight: 900;
-            line-height: 1.16;
+            line-height: 1.12;
             white-space: normal;
+            word-break: normal;
+            overflow-wrap: normal;
+            hyphens: none;
         }
         .metric-badge .metric-dot {
             width: 11px;
@@ -1160,63 +1195,34 @@ def inject_style():
             box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
         }
         .metric-badge .metric-label {
+            display: block;
             min-width: 0;
+            white-space: normal;
+            word-break: normal;
+            overflow-wrap: normal;
+            hyphens: none;
         }
         .metric-badge .metric-number {
+            display: block;
+            grid-column: 2;
+            margin-top: 2px;
             color: #cbd4e6 !important;
             font-size: 0.86em;
             font-style: normal;
             font-weight: 850;
         }
         .metric-badge.compact {
+            grid-template-columns: 10px minmax(0, 1fr);
             gap: 6px;
-            font-size: 0.95rem;
+            font-size: 0.90rem;
         }
         .metric-badge.compact .metric-dot {
             width: 9px;
             height: 9px;
         }
-        .interpretability-panel {
-            display: grid;
-            grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.55fr);
-            gap: 14px;
-            margin: 12px 0 18px 0;
-            align-items: stretch;
-        }
-        .interpretability-card {
-            background: rgba(37,43,56,0.98);
-            border: 1px solid rgba(255,255,255,0.12);
-            border-left: 6px solid var(--osasuna-red);
-            border-radius: 8px;
-            padding: 13px 15px;
-            color: #dbe3f3 !important;
-        }
-        .interpretability-card h4 {
-            margin: 0 0 9px 0 !important;
-            color: #ffffff !important;
-            font-size: 1rem !important;
-            text-transform: uppercase;
-        }
-        .interpretability-level-grid {
-            display: grid;
-            gap: 8px;
-        }
-        .interpretability-level {
-            display: grid;
-            grid-template-columns: 12px minmax(96px, 0.42fr) minmax(0, 1fr);
-            gap: 8px;
-            align-items: center;
-            font-size: 0.86rem;
-            font-weight: 800;
-        }
-        .interpretability-dot {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-        }
         .xt-reference-box {
             display: grid;
-            grid-template-columns: minmax(0, 0.78fr) minmax(250px, 0.42fr);
+            grid-template-columns: minmax(0, 0.82fr) minmax(260px, 0.44fr);
             gap: 14px;
             align-items: center;
             margin: 10px 0 18px 0;
@@ -1232,6 +1238,41 @@ def inject_style():
             font-weight: 700;
             line-height: 1.42;
         }
+        .xt-level-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 8px;
+            margin-top: 13px;
+        }
+        .xt-level-item {
+            background: rgba(15,23,42,0.28);
+            border: 1px solid rgba(255,255,255,0.11);
+            border-radius: 8px;
+            padding: 9px 10px;
+            min-height: 76px;
+        }
+        .xt-level-item b {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            color: #ffffff !important;
+            font-size: 0.88rem;
+            line-height: 1.18;
+        }
+        .xt-level-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+        }
+        .xt-level-item span {
+            display: block;
+            color: #cdd7ea !important;
+            font-size: 0.78rem;
+            line-height: 1.25;
+            margin-top: 5px;
+            font-weight: 750;
+        }
         .xt-reference-box img {
             width: 100%;
             max-height: 260px;
@@ -1241,12 +1282,11 @@ def inject_style():
             background: #111827;
         }
         @media (max-width: 900px) {
-            .interpretability-panel,
             .xt-reference-box {
                 grid-template-columns: 1fr;
             }
-            .interpretability-level {
-                grid-template-columns: 12px minmax(84px, 0.44fr) minmax(0, 1fr);
+            .xt-level-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
             }
         }
         .summary-section-grid {
@@ -1576,6 +1616,9 @@ def inject_style():
             font-size: 1.04rem;
             line-height: 1.16;
             font-weight: 900;
+            word-break: normal;
+            overflow-wrap: normal;
+            hyphens: none;
         }
         @media (max-width: 1100px) {
             .summary-card-grid {
@@ -1636,6 +1679,9 @@ def inject_style():
             color: #ffffff !important;
             font-size: 1.08rem;
             line-height: 1.12;
+            word-break: normal;
+            overflow-wrap: normal;
+            hyphens: none;
         }
         .sequence-read-box {
             background: rgba(15,23,42,0.30);
@@ -2933,7 +2979,7 @@ def _show_image(match_id: int, filename: str, caption: str | None = None, max_wi
 
 
 def _global_app_asset(filename: str) -> Path:
-    return _paths().outputs_dir / "app_data" / "interpretability" / filename
+    return ROOT / "assets" / filename
 
 
 def _image_uri(path: Path) -> str | None:
@@ -2944,58 +2990,26 @@ def _image_uri(path: Path) -> str | None:
     return f"data:{mime};base64,{encoded}"
 
 
-def _render_interpretability_panel():
-    reference = _interpretability_reference()
-    counts = reference.get("counts", {})
-    thresholds = reference.get("thresholds", {})
-    n_sequences = int(reference.get("n_sequences", 0) or 0)
-    rows = []
-    for metric in ["indice_desorganizacion", "indice_peligrosidad_accion"]:
-        metric_name = INDEX_NAMES.get(metric, metric)
-        q = thresholds.get(metric, {})
-        rows.append(
-            f"<h4>{html.escape(metric_name)} | cortes globales</h4>"
-            f"<p><strong>P25</strong> {_format_metric_precise(q.get('p25'))} &middot; "
-            f"<strong>P50</strong> {_format_metric_precise(q.get('p50'))} &middot; "
-            f"<strong>P75</strong> {_format_metric_precise(q.get('p75'))}</p>"
-            '<div class="interpretability-level-grid">'
-        )
-        for label, color in INDEX_LEVELS[metric]:
-            rows.append(
-                '<div class="interpretability-level">'
-                f'<span class="interpretability-dot" style="background:{html.escape(color)}"></span>'
-                f"<strong>{html.escape(label)}</strong>"
-                f"<span>{int(counts.get(metric, {}).get(label, 0))} secuencias</span>"
-                "</div>"
-            )
-        rows.append("</div>")
-    st.markdown(
-        f"""
-        <div class="interpretability-panel">
-            <div class="interpretability-card">
-                <h4>Interpretacion por cuantiles</h4>
-                <p>Los niveles se calculan sobre la muestra global de {n_sequences} secuencias analizadas. El valor exacto se mantiene entre parentesis para no perder precision.</p>
-            </div>
-            <div class="interpretability-card">
-                {''.join(rows)}
-            </div>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-    hist_path = _global_app_asset("histogramas_indices.png")
-    if hist_path.exists():
-        with st.expander("Ver histograma global de IDD e IPO", expanded=False):
-            st.image(str(hist_path), use_container_width=True)
-
-
 def _render_xt_reference_panel():
-    image_uri = _image_uri(_global_app_asset("xt_reference_grid.png"))
+    image_uri = _image_uri(_global_app_asset("xt_grid_reference.png"))
     image_html = f'<img src="{image_uri}" alt="Referencia xThreat" />' if image_uri else ""
+    levels_html = "".join(
+        f"""
+        <div class="xt-level-item">
+            <b><span class="xt-level-dot" style="background:{html.escape(item['color'])};"></span>{html.escape(item['label'])}</b>
+            <span>{html.escape(item['range'])}</span>
+            <span>{html.escape(item['description'])}</span>
+        </div>
+        """
+        for item in xthreat_reference_text()
+    )
     st.markdown(
         f"""
         <div class="xt-reference-box">
-            <p>{html.escape(xthreat_reference_text())}</p>
+            <div>
+                <p>Referencia xThreat: la amenaza crece cuanto más cerca se sitúa la acción de zonas de remate. Estos niveles ayudan a leer la escala de la malla sin convertir el xT en un índice propio.</p>
+                <div class="xt-level-grid">{levels_html}</div>
+            </div>
             {image_html}
         </div>
         """,
@@ -3407,7 +3421,17 @@ def _plot_selectable_sequence_bar(
         st.info("No hay datos suficientes para este grafico.")
         return selected_id
     plot_df = df.copy()
+    plot_df[y] = pd.to_numeric(plot_df[y], errors="coerce")
+    plot_df = plot_df.dropna(subset=[y, "secuencia_rival_id"])
+    if plot_df.empty:
+        st.info("No hay datos suficientes para este grafico.")
+        return selected_id
     plot_df["secuencia"] = plot_df["secuencia_rival_id"].astype(int).astype(str)
+    numeric_text = plot_df[y].dropna()
+    if not numeric_text.empty and np.allclose(numeric_text, numeric_text.round()):
+        plot_df["_bar_text"] = numeric_text.reindex(plot_df.index).map(lambda value: f"{value:.0f}")
+    else:
+        plot_df["_bar_text"] = plot_df[y].map(lambda value: f"{value:.2f}")
     legend_labels = plot_df[color].dropna().astype(str).drop_duplicates().tolist() if color in plot_df.columns else []
     category_colors = color_map or _category_color_map(legend_labels)
     fig = px.bar(
@@ -3415,7 +3439,7 @@ def _plot_selectable_sequence_bar(
         x="secuencia",
         y=y,
         color=color if color in plot_df.columns else None,
-        text=y,
+        text="_bar_text",
         custom_data=["secuencia_rival_id"],
         labels=labels or {"secuencia": "Secuencia", y: y},
         height=height,
@@ -3423,10 +3447,8 @@ def _plot_selectable_sequence_bar(
         color_discrete_sequence=APP_COLOR_SEQUENCE,
         color_discrete_map=category_colors or APP_COLOR_MAP,
     )
-    numeric_text = pd.to_numeric(plot_df[y], errors="coerce").dropna()
-    text_template = "%{text:.0f}" if not numeric_text.empty and np.allclose(numeric_text, numeric_text.round()) else "%{text:.2f}"
     fig.update_traces(
-        texttemplate=text_template,
+        texttemplate="%{text}",
         textposition="outside",
         cliponaxis=False,
         textfont=dict(size=15, color="#f8fafc", family="Arial Black, Arial, sans-serif"),
@@ -4483,9 +4505,12 @@ def _format_percent(value) -> str:
 
 def _metric_key_from_label(label: object) -> str | None:
     text = _display_text(label).upper()
-    if "IDD" in text:
+    if text.startswith("DIF"):
+        return None
+    tokens = set(re.findall(r"[A-ZÁÉÍÓÚÜÑ]+", text))
+    if "IDD" in tokens:
         return "indice_desorganizacion"
-    if "IPO" in text or "IPAR" in text:
+    if "IPO" in tokens or "IPAR" in tokens:
         return "indice_peligrosidad_accion"
     return None
 
@@ -6406,7 +6431,7 @@ def render_portal_home():
     st.markdown(
         """
         <div class="portal-steps-grid">
-            <div class="portal-step-card"><strong>1. Entra a la plataforma</strong><span>Accede con cuenta o continúa como invitado para consultar equipos registrados.</span></div>
+            <div class="portal-step-card"><strong>1. Entra a la plataforma</strong><span>Accede con tu cuenta para consultar los equipos registrados.</span></div>
             <div class="portal-step-card"><strong>2. Selecciona equipo</strong><span>Elige el club del que quieres abrir el entorno de análisis.</span></div>
             <div class="portal-step-card"><strong>3. Elige partido</strong><span>Dentro del club, selecciona el partido procesado que quieres revisar.</span></div>
             <div class="portal-step-card"><strong>4. Revisa el panel</strong><span>Navega por resumen, tipologías, estructura defensiva, secuencias, momentum e informe.</span></div>
@@ -6415,38 +6440,28 @@ def render_portal_home():
         unsafe_allow_html=True,
     )
     st.markdown('<div class="portal-section-title">Equipos registrados</div>', unsafe_allow_html=True)
-    cards = []
     for team in teams:
         logo = _team_logo_html(team.get("team_id"), _initials(str(team.get("name", "EQ"))), "sidebar-crest")
-        cards.append(
-            f"""
-            <div class="team-card">
-                <div class="team-card-logo">{logo}</div>
-                <div>
-                    <strong>{html.escape(str(team.get("name", "Equipo")))}</strong>
-                    <span class="team-pill">{html.escape(str(team.get("status", "Activo")))} · {int(team.get("matches", 0))} partidos</span>
+        cols = st.columns([0.82, 0.18], vertical_alignment="center")
+        with cols[0]:
+            st.markdown(
+                f"""
+                <div class="team-card">
+                    <div class="team-card-logo">{logo}</div>
+                    <div>
+                        <strong>{html.escape(str(team.get("name", "Equipo")))}</strong>
+                        <span class="team-pill">{html.escape(str(team.get("status", "Activo")))} · {int(team.get("matches", 0))} partidos</span>
+                    </div>
                 </div>
-            </div>
-            """
-        )
-    st.markdown(f'<div class="team-card-grid">{"".join(cards)}</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="portal-section-title">Seleccionar equipo</div>', unsafe_allow_html=True)
-    with st.expander("Selecciona el equipo que quieres analizar", expanded=False):
-        for team in teams:
-            cols = st.columns([0.82, 0.18])
-            with cols[0]:
-                st.markdown(
-                    f"**{html.escape(str(team.get('name', 'Equipo')))}**  \n"
-                    f"{html.escape(str(team.get('status', 'Activo')))} · {int(team.get('matches', 0))} partidos",
-                    unsafe_allow_html=True,
-                )
-            with cols[1]:
-                if st.button("Seleccionar", key=f"pick_team_{int(team['team_id'])}", use_container_width=True):
-                    st.session_state["portal_selected_team_id"] = int(team["team_id"])
-                    st.session_state.pop("pending_team_access_id", None)
-                    st.session_state.pop("team_access_error", None)
-                    st.rerun()
+                """,
+                unsafe_allow_html=True,
+            )
+        with cols[1]:
+            if st.button("Seleccionar", key=f"pick_team_{int(team['team_id'])}", use_container_width=True):
+                st.session_state["portal_selected_team_id"] = int(team["team_id"])
+                st.session_state.pop("pending_team_access_id", None)
+                st.session_state.pop("team_access_error", None)
+                st.rerun()
 
     selected_team_id = st.session_state.get("portal_selected_team_id")
     if selected_team_id is not None:
@@ -6475,7 +6490,8 @@ def render_portal_home():
                 st.session_state.pop("pending_team_access_id", None)
                 st.session_state.pop("team_access_error", None)
                 _set_app_view("club", int(pending_team_id))
-            st.session_state["team_access_error"] = "Código incorrecto para este equipo."
+            else:
+                st.session_state["team_access_error"] = "Código incorrecto para este equipo."
         if st.session_state.get("team_access_error"):
             st.error(st.session_state["team_access_error"])
 
@@ -6780,9 +6796,6 @@ def render_desorganizacion(match_id: int, meta: dict):
         f"Esta pestaña explica cómo respondió el bloque de {team_name} ante cada tipología ofensiva rival. Permite cruzar IDD, IPO, Pitch Control, xThreat y causas defensivas para priorizar correcciones.",
     )
 
-    _render_interpretability_panel()
-    _render_xt_reference_panel()
-
     options = ["Seleccione una tipología"] + [value for value in _tipology_options(seq) if value != "Todas"]
     tipologia = st.selectbox(
         "Seleccione una tipología",
@@ -6853,28 +6866,28 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         "Esta pestaña concentra las jugadas que conviene revisar en vídeo primero. Puedes filtrar, ordenar por prioridad, abrir la lectura táctica de cada barra y cargar el vídeo solo cuando lo necesites.",
     )
     _subsection_heading("Jugada crítica: filtrar, ordenar y revisar")
-    st.caption("Selecciona una tipología y un criterio para localizar rápidamente las acciones prioritarias de vídeo.")
-    left, mid = st.columns([1, 1])
-    with left:
-        tipologia = st.selectbox("Tipología", _tipology_options(seq), key=f"crit_tip_{match_id}")
-    with mid:
-        criterio = st.selectbox(
-            "Ordenar por",
-            ["prioridad combinada", "peligrosidad IPO", "desorganización IDD", "xT máximo"],
-            key=f"crit_sort_{match_id}",
-        )
-    current = _filter_tipology(seq, tipologia)
+    st.caption("Filtra solo por IDD, IPO o prioridad combinada. La gráfica muestra el top 5 de acciones para revisar primero.")
+    criterio = st.selectbox(
+        "Ordenar por",
+        ["Combinada", "IPO", "IDD"],
+        key=f"crit_sort_{match_id}",
+    )
+    current = seq.copy()
+    if "score_critico" not in current.columns:
+        current["score_critico"] = (
+            pd.to_numeric(current.get("indice_desorganizacion", pd.Series(0, index=current.index)), errors="coerce").fillna(0)
+            + pd.to_numeric(current.get("indice_peligrosidad_accion", pd.Series(0, index=current.index)), errors="coerce").fillna(0)
+        ) / 2
     sort_col = {
-        "prioridad combinada": "score_critico",
-        "peligrosidad IPO": "indice_peligrosidad_accion",
-        "desorganización IDD": "indice_desorganizacion",
-        "xT máximo": "xT_max",
+        "Combinada": "score_critico",
+        "IPO": "indice_peligrosidad_accion",
+        "IDD": "indice_desorganizacion",
     }[criterio]
     if sort_col in current.columns:
         current = current.sort_values(sort_col, ascending=False)
     all_patterns = [v for v in _tipology_options(seq) if v != "Todas"]
     pattern_color_map = _tipology_color_map(all_patterns)
-    top_for_chart = current.head(10).copy()
+    top_for_chart = current.head(5).copy()
     selected_key = f"crit_seq_selected_{match_id}"
     options = top_for_chart["secuencia_rival_id"].dropna().astype(int).tolist()
     selected = st.session_state.get(selected_key)
@@ -6885,16 +6898,19 @@ def render_secuencias_criticas(match_id: int, meta: dict):
     if selected is not None and selected not in options:
         selected = None
         st.session_state[selected_key] = None
+    if selected is None and options:
+        selected = int(options[0])
+        st.session_state[selected_key] = selected
     if not top_for_chart.empty:
         clicked = _plot_selectable_sequence_bar(
             top_for_chart,
             sort_col,
-            f"Top secuencias por {criterio}",
+            f"Top 5 secuencias por {criterio}",
             color="tipologia",
             selected_id=int(selected) if selected is not None else None,
-            key=f"crit_bar_select_{match_id}_{tipologia}_{criterio}",
+            key=f"crit_bar_select_{match_id}_{criterio}",
             labels={"secuencia": "Secuencia", sort_col: criterio, "tipologia": "Tipología"},
-            height=560,
+            height=500,
             color_map=pattern_color_map,
         )
         if clicked is not None and int(clicked) in options:
@@ -7108,6 +7124,8 @@ def _render_temporal_alert_card(df: pd.DataFrame, window: pd.Series, tone: str, 
     shot_zone = int(part["entra_ultimo_tercio"].sum()) if "entra_ultimo_tercio" in part.columns else 0
     ddi = float(part["ddi"].mean()) if not part.empty else 0.0
     ipar = float(part["ipar"].mean()) if not part.empty else 0.0
+    ddi_html = _index_badge_html("indice_desorganizacion", ddi, compact=True)
+    ipar_html = _index_badge_html("indice_peligrosidad_accion", ipar, compact=True)
     sec = int(len(part))
     stress = float(window.get("stress", 0) or 0) * 100
     tone_text = {
@@ -7123,8 +7141,8 @@ def _render_temporal_alert_card(df: pd.DataFrame, window: pd.Series, tone: str, 
           <div class="temporal-alert-grid">
             <div><span>{sec}</span><small>secuencias</small></div>
             <div><span>{stress:.0f}%</span><small>indice temporal</small></div>
-            <div><span>{ddi:.2f}</span><small>IDD medio</small></div>
-            <div><span>{ipar:.2f}</span><small>IPO medio</small></div>
+            <div><span>{ddi_html}</span><small>IDD medio</small></div>
+            <div><span>{ipar_html}</span><small>IPO medio</small></div>
             <div><span>{shots}</span><small>tiros</small></div>
             <div><span>{shot_zone}</span><small>entradas último tercio</small></div>
             <div><span>{html.escape(_short_pattern_name(pattern_txt, 25))}</span><small>tipología dominante</small></div>
@@ -7154,6 +7172,8 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
     shot_zone = int(part["entra_ultimo_tercio"].sum())
     ddi = float(part["ddi"].mean()) if not part.empty else 0.0
     ipar = float(part["ipar"].mean()) if not part.empty else 0.0
+    ddi_html = _index_badge_html("indice_desorganizacion", ddi, compact=True)
+    ipar_html = _index_badge_html("indice_peligrosidad_accion", ipar, compact=True)
     sec = int(len(part))
     collapse = float(top.get("stress", 0) or 0) * 100
     interpretation = (
@@ -7169,8 +7189,8 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
           <div class="chrono-critical-title">{html.escape(tramo)}'</div>
           <div class="chrono-critical-grid">
             <div><span>{sec}</span><small>secuencias rivales</small></div>
-            <div><span>{ddi:.2f}</span><small>IDD medio</small></div>
-            <div><span>{ipar:.2f}</span><small>IPO medio</small></div>
+            <div><span>{ddi_html}</span><small>IDD medio</small></div>
+            <div><span>{ipar_html}</span><small>IPO medio</small></div>
             <div><span>{shots}</span><small>tiros</small></div>
             <div><span>{shot_zone}</span><small>entradas último tercio</small></div>
             <div><span>{collapse:.0f}%</span><small>Índice De Colapso</small></div>
@@ -7424,6 +7444,12 @@ def render_cronologia(match_id: int, meta: dict):
             font-weight: 950;
             line-height: 1.08;
           }
+          .chrono-critical-grid .metric-badge {
+            font-size: .82rem;
+          }
+          .chrono-critical-grid .metric-number {
+            font-size: .80em;
+          }
           .chrono-critical-grid small {
             display: block;
             color: #cbd4e6;
@@ -7499,6 +7525,12 @@ def render_cronologia(match_id: int, meta: dict):
             font-size: 1.13rem;
             font-weight: 950;
             line-height: 1.08;
+          }
+          .temporal-alert-grid .metric-badge {
+            font-size: .82rem;
+          }
+          .temporal-alert-grid .metric-number {
+            font-size: .80em;
           }
           .temporal-alert-grid small {
             display: block;

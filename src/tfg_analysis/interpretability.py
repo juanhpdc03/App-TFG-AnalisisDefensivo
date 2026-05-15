@@ -1,109 +1,218 @@
+"""Interpretacion tactica de indices propios del proyecto."""
+
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import dataclass
+from typing import Iterable
 
 import numpy as np
 import pandas as pd
 
 
-INDEX_LEVELS = {
-    "indice_desorganizacion": [
-        ("Estable", "#2ecc71"),
-        ("Vulnerable", "#f2c94c"),
-        ("Inestable", "#f2994a"),
-        ("Crítica", "#c8102e"),
-    ],
-    "indice_peligrosidad_accion": [
-        ("Baja amenaza", "#2ecc71"),
-        ("Amenaza moderada", "#f2c94c"),
-        ("Alta amenaza", "#f2994a"),
-        ("Amenaza crítica", "#c8102e"),
-    ],
-}
+IDD_METRIC = "indice_desorganizacion"
+IPO_METRIC = "indice_peligrosidad_accion"
 
 INDEX_NAMES = {
-    "indice_desorganizacion": "IDD",
-    "indice_peligrosidad_accion": "IPO",
+    IDD_METRIC: "IDD",
+    IPO_METRIC: "IPO",
+}
+
+INDEX_LEVELS = {
+    IDD_METRIC: [
+        {
+            "label": "Estable",
+            "description": "La estructura mantiene orden relativo.",
+            "color": "#38c172",
+        },
+        {
+            "label": "Vulnerable",
+            "description": "Aparecen desajustes, todavia sin ruptura clara.",
+            "color": "#f4c542",
+        },
+        {
+            "label": "Inestable",
+            "description": "Hay perdida relevante de control defensivo.",
+            "color": "#ff9f43",
+        },
+        {
+            "label": "Crítica",
+            "description": "La estructura queda muy expuesta.",
+            "color": "#e4143a",
+        },
+    ],
+    IPO_METRIC: [
+        {
+            "label": "Baja",
+            "description": "La secuencia genera poco peligro potencial.",
+            "color": "#38c172",
+        },
+        {
+            "label": "Moderada",
+            "description": "El rival progresa, pero sin alcanzar peligro alto.",
+            "color": "#f4c542",
+        },
+        {
+            "label": "Alta",
+            "description": "La accion alcanza condiciones ofensivas relevantes.",
+            "color": "#ff9f43",
+        },
+        {
+            "label": "Crítica",
+            "description": "La secuencia combina ventaja ofensiva y alto peligro.",
+            "color": "#e4143a",
+        },
+    ],
+}
+
+IPO_MANUAL_THRESHOLDS = {
+    "p25": 0.15,
+    "p50": 0.35,
+    "p75": 0.60,
+    "method": "manual",
 }
 
 
-def load_sequence_population(app_data_dir: str | Path) -> pd.DataFrame:
-    root = Path(app_data_dir)
-    rows = []
-    for path in sorted(root.glob("*/secuencias_detalle.csv")):
-        if not path.parent.name.isdigit():
-            continue
-        df = pd.read_csv(path, low_memory=False)
-        if df.empty:
-            continue
-        df.insert(0, "match_id_app", int(path.parent.name))
-        rows.append(df)
-    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+@dataclass(frozen=True)
+class ThresholdReference:
+    metric: str
+    p25: float
+    p50: float
+    p75: float
+    n: int
+    method: str
+
+    def as_dict(self) -> dict[str, float | int | str]:
+        return {
+            "metric": self.metric,
+            "p25": float(self.p25),
+            "p50": float(self.p50),
+            "p75": float(self.p75),
+            "n": int(self.n),
+            "method": self.method,
+        }
 
 
-def quantile_thresholds(series: pd.Series) -> dict[str, float]:
-    values = pd.to_numeric(series, errors="coerce").dropna()
-    if values.empty:
-        return {"p25": np.nan, "p50": np.nan, "p75": np.nan, "n": 0}
-    q = values.quantile([0.25, 0.50, 0.75])
+def _clean_values(values: Iterable[float] | pd.Series | np.ndarray) -> pd.Series:
+    series = pd.to_numeric(pd.Series(values), errors="coerce")
+    return series.replace([np.inf, -np.inf], np.nan).dropna()
+
+
+def metric_thresholds(metric: str, values: Iterable[float] | pd.Series | np.ndarray) -> ThresholdReference:
+    """Devuelve umbrales de interpretacion para un indice.
+
+    IDD se interpreta de forma relativa con percentiles de la muestra global.
+    IPO/IPAR usa cortes manuales definidos por criterio futbolistico.
+    """
+
+    clean = _clean_values(values)
+    n = int(clean.shape[0])
+    if metric == IPO_METRIC:
+        return ThresholdReference(
+            metric=metric,
+            p25=IPO_MANUAL_THRESHOLDS["p25"],
+            p50=IPO_MANUAL_THRESHOLDS["p50"],
+            p75=IPO_MANUAL_THRESHOLDS["p75"],
+            n=n,
+            method="manual",
+        )
+
+    if clean.empty:
+        return ThresholdReference(metric=metric, p25=0.25, p50=0.50, p75=0.75, n=0, method="percentiles")
+
+    p25, p50, p75 = np.nanpercentile(clean, [25, 50, 75])
+    return ThresholdReference(metric=metric, p25=float(p25), p50=float(p50), p75=float(p75), n=n, method="percentiles")
+
+
+def classify_index_value(
+    metric: str,
+    value: float | int | None,
+    thresholds: ThresholdReference | dict[str, float | int | str],
+) -> dict[str, object]:
+    """Clasifica un valor exacto en uno de los cuatro niveles tacticos."""
+
+    levels = INDEX_LEVELS.get(metric, INDEX_LEVELS[IDD_METRIC])
+    if value is None or pd.isna(value):
+        return {
+            "label": "-",
+            "level": 0,
+            "color": "#6b7280",
+            "description": "Sin dato disponible.",
+            "value": None,
+        }
+
+    if isinstance(thresholds, ThresholdReference):
+        reference = thresholds.as_dict()
+    else:
+        reference = thresholds
+
+    val = float(value)
+    p25 = float(reference.get("p25", 0.25))
+    p50 = float(reference.get("p50", 0.50))
+    p75 = float(reference.get("p75", 0.75))
+
+    if val < p25:
+        level = 0
+    elif val < p50:
+        level = 1
+    elif val < p75:
+        level = 2
+    else:
+        level = 3
+
+    current = levels[level]
     return {
-        "p25": float(q.loc[0.25]),
-        "p50": float(q.loc[0.50]),
-        "p75": float(q.loc[0.75]),
-        "n": int(values.shape[0]),
+        "label": current["label"],
+        "level": level + 1,
+        "color": current["color"],
+        "description": current["description"],
+        "value": val,
     }
 
 
-def classify_index_value(metric: str, value, thresholds: dict[str, float]) -> dict[str, object]:
-    levels = INDEX_LEVELS[metric]
-    numeric = pd.to_numeric(pd.Series([value]), errors="coerce").iloc[0]
-    if pd.isna(numeric):
-        return {"label": "-", "color": "#6b7280", "value": np.nan, "level": None}
-    p25 = thresholds.get("p25", np.nan)
-    p50 = thresholds.get("p50", np.nan)
-    p75 = thresholds.get("p75", np.nan)
-    if pd.isna(p25) or pd.isna(p50) or pd.isna(p75):
-        idx = 0
-    elif numeric < p25:
-        idx = 0
-    elif numeric < p50:
-        idx = 1
-    elif numeric < p75:
-        idx = 2
-    else:
-        idx = 3
-    label, color = levels[idx]
-    return {"label": label, "color": color, "value": float(numeric), "level": idx + 1}
+def build_interpretability_reference(sequences: pd.DataFrame) -> dict[str, dict[str, object]]:
+    """Construye referencias globales para IDD e IPO a partir de las secuencias."""
+
+    references: dict[str, dict[str, object]] = {}
+    for metric in (IDD_METRIC, IPO_METRIC):
+        values = sequences[metric] if metric in sequences.columns else pd.Series(dtype=float)
+        thresholds = metric_thresholds(metric, values)
+        counts = [0, 0, 0, 0]
+        for raw_value in _clean_values(values):
+            classified = classify_index_value(metric, raw_value, thresholds)
+            counts[int(classified["level"]) - 1] += 1
+
+        references[metric] = {
+            "thresholds": thresholds.as_dict(),
+            "counts": counts,
+            "levels": INDEX_LEVELS[metric],
+        }
+    return references
 
 
-def classify_series(metric: str, series: pd.Series, thresholds: dict[str, float]) -> pd.Series:
-    values = pd.to_numeric(series, errors="coerce")
-    labels = []
-    for value in values:
-        labels.append(classify_index_value(metric, value, thresholds)["label"])
-    return pd.Series(labels, index=series.index)
-
-
-def build_interpretability_reference(app_data_dir: str | Path) -> dict[str, object]:
-    population = load_sequence_population(app_data_dir)
-    thresholds = {}
-    counts = {}
-    for metric in INDEX_LEVELS:
-        if population.empty or metric not in population.columns:
-            thresholds[metric] = {"p25": np.nan, "p50": np.nan, "p75": np.nan, "n": 0}
-            counts[metric] = {label: 0 for label, _ in INDEX_LEVELS[metric]}
-            continue
-        metric_thresholds = quantile_thresholds(population[metric])
-        thresholds[metric] = metric_thresholds
-        labels = classify_series(metric, population[metric], metric_thresholds)
-        ordered = [label for label, _ in INDEX_LEVELS[metric]]
-        counts[metric] = labels.value_counts().reindex(ordered, fill_value=0).astype(int).to_dict()
-    return {"thresholds": thresholds, "counts": counts, "n_sequences": int(len(population))}
-
-
-def xthreat_reference_text() -> str:
-    return (
-        "En la malla xThreat usada como referencia, valores cercanos a 0.00-0.05 indican amenaza baja; "
-        "entre 0.05 y 0.10 amenaza moderada; a partir de 0.10 la accion ya entra en zona alta, "
-        "y por encima de 0.20 se interpreta como amenaza muy peligrosa cerca del area."
-    )
+def xthreat_reference_text() -> list[dict[str, str]]:
+    return [
+        {
+            "label": "Baja",
+            "range": "< 0.05",
+            "color": "#38c172",
+            "description": "Zonas de bajo valor esperado.",
+        },
+        {
+            "label": "Moderada",
+            "range": "0.05 - 0.10",
+            "color": "#f4c542",
+            "description": "Progresion con amenaza reconocible.",
+        },
+        {
+            "label": "Alta",
+            "range": "0.10 - 0.20",
+            "color": "#ff9f43",
+            "description": "Entrada en zonas de peligro relevante.",
+        },
+        {
+            "label": "Muy peligrosa",
+            "range": ">= 0.20",
+            "color": "#e4143a",
+            "description": "Cercania al area y alto potencial de ocasion.",
+        },
+    ]
