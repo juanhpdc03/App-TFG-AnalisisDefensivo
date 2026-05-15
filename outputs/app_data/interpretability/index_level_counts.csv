@@ -1,0 +1,9 @@
+﻿metric,name,level,color,count
+indice_desorganizacion,IDD,Estable,#2ecc71,68
+indice_desorganizacion,IDD,Vulnerable,#f2c94c,68
+indice_desorganizacion,IDD,Inestable,#f2994a,68
+indice_desorganizacion,IDD,Crítica,#c8102e,69
+indice_peligrosidad_accion,IPO,Baja amenaza,#2ecc71,68
+indice_peligrosidad_accion,IPO,Amenaza moderada,#f2c94c,66
+indice_peligrosidad_accion,IPO,Alta amenaza,#f2994a,70
+indice_peligrosidad_accion,IPO,Amenaza crítica,#c8102e,69

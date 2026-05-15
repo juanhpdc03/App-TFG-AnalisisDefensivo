@@ -43,6 +43,7 @@ jobs:
         run: |
           TEAM_ID="${BEPRO_TEAM_ID:-12987}"
           python scripts/auto_update_bepro.py --team-id "$TEAM_ID"
+          python scripts/build_interpretability.py
 
       - name: Guardar resultados generados
         run: |

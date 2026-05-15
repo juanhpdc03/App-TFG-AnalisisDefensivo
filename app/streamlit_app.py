@@ -35,6 +35,13 @@ if str(SRC) not in sys.path:
 from tfg_analysis.app_data import listar_app_data_disponible
 from tfg_analysis.config import FIELD_LENGTH_M, FIELD_WIDTH_M, ProjectPaths
 from tfg_analysis.features.threat import _asignar_celda_xt, _crear_xt_grid
+from tfg_analysis.interpretability import (
+    INDEX_LEVELS,
+    INDEX_NAMES,
+    build_interpretability_reference,
+    classify_index_value,
+    xthreat_reference_text,
+)
 from tfg_analysis.io import listar_tracking_disponible
 
 
@@ -114,6 +121,11 @@ st.set_page_config(
 
 def _paths() -> ProjectPaths:
     return ProjectPaths(root=ROOT).resolve()
+
+
+@st.cache_data(show_spinner=False)
+def _interpretability_reference() -> dict:
+    return build_interpretability_reference(str(_paths().outputs_dir / "app_data"))
 
 
 def inject_style():
@@ -1128,6 +1140,114 @@ def inject_style():
         .analysis-card.compact .value {
             font-size: 1.05rem;
             line-height: 1.25;
+        }
+        .metric-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            min-width: 0;
+            max-width: 100%;
+            color: #ffffff !important;
+            font-weight: 900;
+            line-height: 1.16;
+            white-space: normal;
+        }
+        .metric-badge .metric-dot {
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            flex: 0 0 auto;
+            box-shadow: 0 0 0 4px rgba(255,255,255,0.08);
+        }
+        .metric-badge .metric-label {
+            min-width: 0;
+        }
+        .metric-badge .metric-number {
+            color: #cbd4e6 !important;
+            font-size: 0.86em;
+            font-style: normal;
+            font-weight: 850;
+        }
+        .metric-badge.compact {
+            gap: 6px;
+            font-size: 0.95rem;
+        }
+        .metric-badge.compact .metric-dot {
+            width: 9px;
+            height: 9px;
+        }
+        .interpretability-panel {
+            display: grid;
+            grid-template-columns: minmax(0, 0.95fr) minmax(280px, 0.55fr);
+            gap: 14px;
+            margin: 12px 0 18px 0;
+            align-items: stretch;
+        }
+        .interpretability-card {
+            background: rgba(37,43,56,0.98);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-left: 6px solid var(--osasuna-red);
+            border-radius: 8px;
+            padding: 13px 15px;
+            color: #dbe3f3 !important;
+        }
+        .interpretability-card h4 {
+            margin: 0 0 9px 0 !important;
+            color: #ffffff !important;
+            font-size: 1rem !important;
+            text-transform: uppercase;
+        }
+        .interpretability-level-grid {
+            display: grid;
+            gap: 8px;
+        }
+        .interpretability-level {
+            display: grid;
+            grid-template-columns: 12px minmax(96px, 0.42fr) minmax(0, 1fr);
+            gap: 8px;
+            align-items: center;
+            font-size: 0.86rem;
+            font-weight: 800;
+        }
+        .interpretability-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .xt-reference-box {
+            display: grid;
+            grid-template-columns: minmax(0, 0.78fr) minmax(250px, 0.42fr);
+            gap: 14px;
+            align-items: center;
+            margin: 10px 0 18px 0;
+            background: rgba(37,43,56,0.82);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-left: 5px solid #2453a6;
+            border-radius: 8px;
+            padding: 13px;
+        }
+        .xt-reference-box p {
+            margin: 0;
+            color: #dbe3f3 !important;
+            font-weight: 700;
+            line-height: 1.42;
+        }
+        .xt-reference-box img {
+            width: 100%;
+            max-height: 260px;
+            object-fit: contain;
+            border-radius: 7px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: #111827;
+        }
+        @media (max-width: 900px) {
+            .interpretability-panel,
+            .xt-reference-box {
+                grid-template-columns: 1fr;
+            }
+            .interpretability-level {
+                grid-template-columns: 12px minmax(84px, 0.44fr) minmax(0, 1fr);
+            }
         }
         .summary-section-grid {
             display: grid;
@@ -2812,6 +2932,77 @@ def _show_image(match_id: int, filename: str, caption: str | None = None, max_wi
         st.info(f"No se ha generado {filename}.")
 
 
+def _global_app_asset(filename: str) -> Path:
+    return _paths().outputs_dir / "app_data" / "interpretability" / filename
+
+
+def _image_uri(path: Path) -> str | None:
+    if not path.exists():
+        return None
+    mime = "image/png" if path.suffix.lower() == ".png" else "image/jpeg"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime};base64,{encoded}"
+
+
+def _render_interpretability_panel():
+    reference = _interpretability_reference()
+    counts = reference.get("counts", {})
+    thresholds = reference.get("thresholds", {})
+    n_sequences = int(reference.get("n_sequences", 0) or 0)
+    rows = []
+    for metric in ["indice_desorganizacion", "indice_peligrosidad_accion"]:
+        metric_name = INDEX_NAMES.get(metric, metric)
+        q = thresholds.get(metric, {})
+        rows.append(
+            f"<h4>{html.escape(metric_name)} | cortes globales</h4>"
+            f"<p><strong>P25</strong> {_format_metric_precise(q.get('p25'))} &middot; "
+            f"<strong>P50</strong> {_format_metric_precise(q.get('p50'))} &middot; "
+            f"<strong>P75</strong> {_format_metric_precise(q.get('p75'))}</p>"
+            '<div class="interpretability-level-grid">'
+        )
+        for label, color in INDEX_LEVELS[metric]:
+            rows.append(
+                '<div class="interpretability-level">'
+                f'<span class="interpretability-dot" style="background:{html.escape(color)}"></span>'
+                f"<strong>{html.escape(label)}</strong>"
+                f"<span>{int(counts.get(metric, {}).get(label, 0))} secuencias</span>"
+                "</div>"
+            )
+        rows.append("</div>")
+    st.markdown(
+        f"""
+        <div class="interpretability-panel">
+            <div class="interpretability-card">
+                <h4>Interpretacion por cuantiles</h4>
+                <p>Los niveles se calculan sobre la muestra global de {n_sequences} secuencias analizadas. El valor exacto se mantiene entre parentesis para no perder precision.</p>
+            </div>
+            <div class="interpretability-card">
+                {''.join(rows)}
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+    hist_path = _global_app_asset("histogramas_indices.png")
+    if hist_path.exists():
+        with st.expander("Ver histograma global de IDD e IPO", expanded=False):
+            st.image(str(hist_path), use_container_width=True)
+
+
+def _render_xt_reference_panel():
+    image_uri = _image_uri(_global_app_asset("xt_reference_grid.png"))
+    image_html = f'<img src="{image_uri}" alt="Referencia xThreat" />' if image_uri else ""
+    st.markdown(
+        f"""
+        <div class="xt-reference-box">
+            <p>{html.escape(xthreat_reference_text())}</p>
+            {image_html}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
 def _show_table(df: pd.DataFrame, height: int | None = 300):
     if df.empty:
         st.info("No hay datos para esta tabla.")
@@ -4270,6 +4461,61 @@ def _format_metric(value):
     return str(value)
 
 
+def _format_metric_precise(value, digits: int = 3) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if pd.isna(numeric):
+        return "-"
+    return f"{numeric:.{digits}f}"
+
+
+def _format_percent(value) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if pd.isna(numeric):
+        return "-"
+    return f"{numeric * 100:.0f}%"
+
+
+def _metric_key_from_label(label: object) -> str | None:
+    text = _display_text(label).upper()
+    if "IDD" in text:
+        return "indice_desorganizacion"
+    if "IPO" in text or "IPAR" in text:
+        return "indice_peligrosidad_accion"
+    return None
+
+
+def _index_badge_html(metric: str, value, compact: bool = False) -> str:
+    reference = _interpretability_reference()
+    thresholds = reference.get("thresholds", {}).get(metric, {})
+    info = classify_index_value(metric, value, thresholds)
+    label = html.escape(str(info.get("label", "-")))
+    number = _format_metric_precise(info.get("value"), 3)
+    color = html.escape(str(info.get("color", "#6b7280")))
+    compact_class = " compact" if compact else ""
+    return (
+        f'<span class="metric-badge{compact_class}">'
+        f'<span class="metric-dot" style="background:{color};"></span>'
+        f'<span class="metric-label">{label}</span>'
+        f'<span class="metric-number">({number})</span>'
+        "</span>"
+    )
+
+
+def _metric_value_html(label: object, value) -> str:
+    metric = _metric_key_from_label(label)
+    if metric is not None:
+        return _index_badge_html(metric, value, compact=True)
+    if "PITCH CONTROL" in _display_text(label).upper():
+        return html.escape(_format_percent(value))
+    return html.escape(_format_metric(value))
+
+
 def _first(df: pd.DataFrame, col: str, default: str = "-"):
     if df.empty or col not in df.columns:
         return default
@@ -4359,12 +4605,12 @@ def _sum_column(df: pd.DataFrame, col: str, default: str = "-"):
 
 
 def _card(label: str, value, compact: bool = False):
-    value_text = _format_metric(value)
+    value_text = _metric_value_html(label, value)
     extra_class = " compact" if compact else ""
     st.markdown(
         f"""
         <div class="analysis-card{extra_class}">
-            <div class="label">{label}</div>
+            <div class="label">{html.escape(str(label))}</div>
             <div class="value">{value_text}</div>
         </div>
         """,
@@ -4376,7 +4622,7 @@ def _summary_card_html(label: str, value) -> str:
     return (
         '<div class="analysis-card compact">'
         f'<div class="label">{html.escape(str(label))}</div>'
-        f'<div class="value">{html.escape(_format_metric(value))}</div>'
+        f'<div class="value">{_metric_value_html(label, value)}</div>'
         "</div>"
     )
 
@@ -4389,7 +4635,7 @@ def _summary_combo_card_html(items: list[tuple[str, object]]) -> str:
         parts.append(
             '<div class="summary-combo-item">'
             f'<div class="label">{html.escape(str(label))}</div>'
-            f'<div class="value">{html.escape(_format_metric(value))}</div>'
+            f'<div class="value">{_metric_value_html(label, value)}</div>'
             "</div>"
         )
     return (
@@ -5889,13 +6135,22 @@ def _sequence_display_table(df: pd.DataFrame, n: int = 12) -> pd.DataFrame:
             + " / "
             + source.get("es_gol", pd.Series(0, index=source.index)).map(_int_flag).astype(str)
         )
+        reference = _interpretability_reference().get("thresholds", {})
+        if "indice_desorganizacion" in source.columns:
+            source["idd_lectura"] = source["indice_desorganizacion"].apply(
+                lambda value: f"{classify_index_value('indice_desorganizacion', value, reference.get('indice_desorganizacion', {}))['label']} ({_format_metric_precise(value, 3)})"
+            )
+        if "indice_peligrosidad_accion" in source.columns:
+            source["ipo_lectura"] = source["indice_peligrosidad_accion"].apply(
+                lambda value: f"{classify_index_value('indice_peligrosidad_accion', value, reference.get('indice_peligrosidad_accion', {}))['label']} ({_format_metric_precise(value, 3)})"
+            )
     cols = [
         "secuencia_rival_id",
         "tipologia_id",
         "minuto_partido",
         "duracion_seg",
-        "indice_desorganizacion",
-        "indice_peligrosidad_accion",
+        "idd_lectura",
+        "ipo_lectura",
         "xT_max",
         "tiro/a puerta/gol",
         "causa_tactica",
@@ -5906,8 +6161,8 @@ def _sequence_display_table(df: pd.DataFrame, n: int = 12) -> pd.DataFrame:
         "tipologia_id": "tipologia",
         "minuto_partido": "min",
         "duracion_seg": "duracion",
-        "indice_desorganizacion": "IDD",
-        "indice_peligrosidad_accion": "IPO",
+        "idd_lectura": "IDD",
+        "ipo_lectura": "IPO",
         "xT_max": "xT max",
         "causa_tactica": "causa",
     }
@@ -6506,6 +6761,7 @@ def render_ataque_rival(match_id: int, meta: dict):
             )
         _subsection_heading("Evolución media de la amenaza concedida por tipología")
         st.caption("Lectura táctica: compara cuándo escala el xT de cada tipología. La zona final de la curva suele señalar el momento de aceleración o finalización.")
+        _render_xt_reference_panel()
         if not _plot_xt_evolution(match_id, meta, clusters):
             _show_image(match_id, figs["amenaza_media_cluster"], max_width=1040)
     with st.expander("Ver ficha numérica de tipologías"):
@@ -6523,6 +6779,9 @@ def render_desorganizacion(match_id: int, meta: dict):
         "Lectura general de la estructura defensiva",
         f"Esta pestaña explica cómo respondió el bloque de {team_name} ante cada tipología ofensiva rival. Permite cruzar IDD, IPO, Pitch Control, xThreat y causas defensivas para priorizar correcciones.",
     )
+
+    _render_interpretability_panel()
+    _render_xt_reference_panel()
 
     options = ["Seleccione una tipología"] + [value for value in _tipology_options(seq) if value != "Todas"]
     tipologia = st.selectbox(
@@ -6684,8 +6943,8 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         <div class="sequence-card">
             <h4>Secuencia {int(selected)} &middot; {tipologia_txt} &middot; minuto {_format_metric(row.get('minuto_partido'))}</h4>
             <div class="sequence-kpi-row">
-                <div class="sequence-kpi"><span>IDD</span><strong>{_format_metric(row.get('indice_desorganizacion'))}</strong></div>
-                <div class="sequence-kpi"><span>IPO</span><strong>{_format_metric(row.get('indice_peligrosidad_accion'))}</strong></div>
+                <div class="sequence-kpi"><span>IDD</span><strong>{_index_badge_html('indice_desorganizacion', row.get('indice_desorganizacion'), compact=True)}</strong></div>
+                <div class="sequence-kpi"><span>IPO</span><strong>{_index_badge_html('indice_peligrosidad_accion', row.get('indice_peligrosidad_accion'), compact=True)}</strong></div>
                 <div class="sequence-kpi"><span>xT max</span><strong>{_format_metric(row.get('xT_max'))}</strong></div>
                 <div class="sequence-kpi"><span>Incremento xT</span><strong>{_format_metric(row.get('xT_added'))}</strong></div>
             </div>
