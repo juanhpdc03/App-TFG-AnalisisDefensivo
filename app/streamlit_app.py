@@ -125,18 +125,17 @@ def _paths() -> ProjectPaths:
 def _interpretability_reference() -> dict:
     app_data_dir = _paths().outputs_dir / "app_data"
     frames: list[pd.DataFrame] = []
-    available = listar_app_data_disponible(app_data_dir)
-    if not available.empty and "match_id" in available.columns:
-        for match_id in available["match_id"].dropna().astype(int).tolist():
-            match_dir = app_data_dir / str(int(match_id))
-            for filename in ("secuencias_detalle.csv", "ranking_secuencias.csv"):
-                path = match_dir / filename
-                if path.exists():
-                    try:
-                        frames.append(pd.read_csv(path))
-                    except (OSError, EmptyDataError):
-                        pass
-                    break
+    for match_dir in sorted(app_data_dir.iterdir() if app_data_dir.exists() else []):
+        if not match_dir.is_dir() or not match_dir.name.isdigit():
+            continue
+        for filename in ("secuencias_detalle.csv", "ranking_secuencias.csv"):
+            path = match_dir / filename
+            if path.exists():
+                try:
+                    frames.append(pd.read_csv(path))
+                except (OSError, EmptyDataError):
+                    pass
+                break
     sequences = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
     reference = build_interpretability_reference(sequences)
     reference["thresholds"] = {
@@ -929,6 +928,40 @@ def inject_style():
             align-items: center;
             border-top-color: #2453a6;
         }
+        .registered-team-card-marker {
+            display: none;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.registered-team-card-marker) {
+            background: rgba(32,37,50,0.78);
+            border: 1px solid rgba(255,255,255,0.11);
+            border-top: 4px solid #2453a6;
+            border-radius: 8px;
+            padding: 16px;
+            box-shadow: 0 12px 28px rgba(0,0,0,0.18);
+            margin: 10px 0 18px;
+            align-items: center;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.registered-team-card-marker) .team-card {
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+            padding: 0;
+            margin: 0;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.registered-team-card-marker) div[data-testid="stButton"] button {
+            background: var(--osasuna-red) !important;
+            color: #ffffff !important;
+            border: 1px solid rgba(255,255,255,0.22) !important;
+            border-radius: 8px !important;
+            min-height: 48px !important;
+            font-size: 0.95rem !important;
+            font-weight: 950 !important;
+            box-shadow: 0 12px 22px rgba(200,16,46,0.24) !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.registered-team-card-marker) div[data-testid="stButton"] button p {
+            color: #ffffff !important;
+            font-weight: 950 !important;
+        }
         .team-card .team-card-logo .sidebar-crest {
             width: 72px;
             height: 72px;
@@ -964,16 +997,17 @@ def inject_style():
                 linear-gradient(135deg, rgba(10,16,32,0.96), rgba(36,83,166,0.34) 48%, rgba(200,16,46,0.24));
         }
         .club-home-card .sidebar-crest {
-            width: 94px;
-            height: 94px;
+            width: 92px;
+            height: 92px;
             margin: 0;
-            padding: 10px;
+            padding: 14px;
         }
         .club-home-card h1 {
             color: #ffffff !important;
-            font-size: 2.35rem;
+            font-size: 3.15rem;
             line-height: 1.08;
             margin: 0;
+            font-weight: 950;
             text-transform: none;
         }
         .club-stat-grid {
@@ -2993,15 +3027,24 @@ def _image_uri(path: Path) -> str | None:
 def _render_xt_reference_panel():
     image_uri = _image_uri(_global_app_asset("xt_grid_reference.png"))
     image_html = f'<img src="{image_uri}" alt="Referencia xThreat" />' if image_uri else ""
+    xt_items = xthreat_reference_text()
+    if isinstance(xt_items, str):
+        xt_items = [
+            {"label": "Baja", "range": "< 0.05", "color": "#38c172", "description": "Zonas de bajo valor esperado."},
+            {"label": "Moderada", "range": "0.05 - 0.10", "color": "#f4c542", "description": "Progresión con amenaza reconocible."},
+            {"label": "Alta", "range": "0.10 - 0.20", "color": "#ff9f43", "description": "Entrada en zonas de peligro relevante."},
+            {"label": "Muy peligrosa", "range": ">= 0.20", "color": "#e4143a", "description": "Cercanía al área y alto potencial de ocasión."},
+        ]
     levels_html = "".join(
         f"""
         <div class="xt-level-item">
-            <b><span class="xt-level-dot" style="background:{html.escape(item['color'])};"></span>{html.escape(item['label'])}</b>
-            <span>{html.escape(item['range'])}</span>
-            <span>{html.escape(item['description'])}</span>
+            <b><span class="xt-level-dot" style="background:{html.escape(str(item.get('color', '#6b7280')))};"></span>{html.escape(str(item.get('label', '-')))}</b>
+            <span>{html.escape(str(item.get('range', '-')))}</span>
+            <span>{html.escape(str(item.get('description', '')))}</span>
         </div>
         """
-        for item in xthreat_reference_text()
+        for item in xt_items
+        if isinstance(item, dict)
     )
     st.markdown(
         f"""
@@ -6446,6 +6489,7 @@ def render_portal_home():
         with cols[0]:
             st.markdown(
                 f"""
+                <span class="registered-team-card-marker"></span>
                 <div class="team-card">
                     <div class="team-card-logo">{logo}</div>
                     <div>
@@ -6457,7 +6501,7 @@ def render_portal_home():
                 unsafe_allow_html=True,
             )
         with cols[1]:
-            if st.button("Seleccionar", key=f"pick_team_{int(team['team_id'])}", use_container_width=True):
+            if st.button("Seleccionar", key=f"pick_team_{int(team['team_id'])}", type="primary", use_container_width=True):
                 st.session_state["portal_selected_team_id"] = int(team["team_id"])
                 st.session_state.pop("pending_team_access_id", None)
                 st.session_state.pop("team_access_error", None)
