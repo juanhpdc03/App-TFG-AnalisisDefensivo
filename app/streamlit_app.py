@@ -35,7 +35,7 @@ if str(SRC) not in sys.path:
 from tfg_analysis.app_data import listar_app_data_disponible
 from tfg_analysis.config import FIELD_LENGTH_M, FIELD_WIDTH_M, ProjectPaths
 from tfg_analysis.features.threat import _asignar_celda_xt, _crear_xt_grid
-from tfg_analysis.interpretability import (
+from tfg_analysis.index_interpretation import (
     build_interpretability_reference,
     classify_index_value,
     xthreat_reference_text,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterable
 
 import numpy as np
@@ -169,9 +170,37 @@ def classify_index_value(
     }
 
 
-def build_interpretability_reference(sequences: pd.DataFrame) -> dict[str, dict[str, object]]:
+def load_sequence_population(app_data_dir: str | Path) -> pd.DataFrame:
+    root = Path(app_data_dir)
+    if not root.exists():
+        return pd.DataFrame()
+    rows = []
+    for folder in sorted(root.iterdir()):
+        if not folder.is_dir() or not folder.name.isdigit():
+            continue
+        for filename in ("secuencias_detalle.csv", "ranking_secuencias.csv"):
+            path = folder / filename
+            if path.exists():
+                try:
+                    rows.append(pd.read_csv(path))
+                except (OSError, pd.errors.EmptyDataError):
+                    pass
+                break
+    return pd.concat(rows, ignore_index=True) if rows else pd.DataFrame()
+
+
+def _coerce_sequence_population(source: pd.DataFrame | str | Path | None) -> pd.DataFrame:
+    if isinstance(source, pd.DataFrame):
+        return source.copy()
+    if source is None:
+        return pd.DataFrame()
+    return load_sequence_population(source)
+
+
+def build_interpretability_reference(sequences: pd.DataFrame | str | Path | None) -> dict[str, dict[str, object]]:
     """Construye referencias globales para IDD e IPO a partir de las secuencias."""
 
+    sequences = _coerce_sequence_population(sequences)
     references: dict[str, dict[str, object]] = {}
     for metric in (IDD_METRIC, IPO_METRIC):
         values = sequences[metric] if metric in sequences.columns else pd.Series(dtype=float)
