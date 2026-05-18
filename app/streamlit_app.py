@@ -7273,7 +7273,7 @@ def _chronology_windows(df: pd.DataFrame) -> pd.DataFrame:
     bins = [0, 15, 30, 45, 60, 75, 90, 120]
     labels = ["0-15", "16-30", "31-45", "46-60", "61-75", "76-90", "90+"]
     tmp = df.copy()
-    tmp["tramo"] = pd.cut(tmp["minuto_partido"], bins=bins, labels=labels, include_lowest=True)
+    tmp["tramo"] = pd.cut(tmp["minuto_partido"], bins=bins, labels=labels, include_lowest=True, right=False)
     grouped = (
         tmp.groupby("tramo", observed=False)
         .agg(
@@ -7289,7 +7289,7 @@ def _chronology_windows(df: pd.DataFrame) -> pd.DataFrame:
     )
     timeline = _defensive_momentum_timeline(tmp)
     if not timeline.empty:
-        timeline["tramo"] = pd.cut(timeline["minuto"], bins=bins, labels=labels, include_lowest=True)
+        timeline["tramo"] = pd.cut(timeline["minuto"], bins=bins, labels=labels, include_lowest=True, right=False)
         momentum_windows = (
             timeline.groupby("tramo", observed=False)
             .agg(
@@ -7321,6 +7321,22 @@ def _dominant_value(df: pd.DataFrame, col: str) -> str:
 
 def _window_interval(window: pd.Series) -> tuple[float, float, str]:
     tramo = str(window.get("tramo", "-"))
+    football_windows = {
+        "0-15": (0.0, 15.0),
+        "16-30": (15.0, 30.0),
+        "31-45": (30.0, 45.0),
+        "46-60": (45.0, 60.0),
+        "61-75": (60.0, 75.0),
+        "76-90": (75.0, 90.0),
+        "90+": (90.0, 120.0),
+    }
+    if tramo in football_windows:
+        start, end = football_windows[tramo]
+        return start, end, tramo
+    if tramo.endswith("+"):
+        start_txt = tramo[:-1].strip()
+        start = float(start_txt) if start_txt else 90.0
+        return start, 120.0, tramo
     if "-" not in tramo:
         return 0.0, 120.0, tramo
     start_txt, end_txt = tramo.split("-", 1)
@@ -7405,11 +7421,7 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
     if df.empty or windows.empty:
         return None
     top = windows.sort_values("stress", ascending=False).iloc[0]
-    tramo = str(top["tramo"])
-    start_txt = tramo.split("-")[0].replace("+", "")
-    end_txt = tramo.split("-")[1] if "-" in tramo else "120"
-    start = float(start_txt)
-    end = 120.0 if end_txt.endswith("+") else float(end_txt)
+    start, end, tramo = _window_interval(top)
     part = df[df["minuto_partido"].between(start, end, inclusive="left")].copy()
     pattern_txt = _dominant_value(part, "tipologia")
     lane_txt = _dominant_value(part, "carril")
@@ -7475,9 +7487,7 @@ def _plot_defensive_momentum(df: pd.DataFrame, critical: pd.Series | None):
     fig.add_annotation(x=1, y=(MOMENTUM_ALERT_THRESHOLD + MOMENTUM_STRESS_THRESHOLD) / 2, text="ALERTA", showarrow=False, font=dict(color="#f2c94c", size=11), bgcolor="rgba(32,37,50,0.54)")
     fig.add_annotation(x=1, y=min(y_upper - 0.025, MOMENTUM_STRESS_THRESHOLD + 0.035), text="ESTRES ALTO", showarrow=False, font=dict(color="#ff8a9b", size=11), bgcolor="rgba(32,37,50,0.54)")
     if critical is not None and "tramo" in critical:
-        tramo = str(critical["tramo"])
-        start = float(tramo.split("-")[0].replace("+", ""))
-        end = 120.0 if "+" in tramo else float(tramo.split("-")[1])
+        start, end, _ = _window_interval(critical)
         fig.add_vrect(x0=start, x1=end, fillcolor="rgba(200,16,46,0.08)", line_width=0, layer="below")
     fig.add_trace(
         go.Scatter(
@@ -7491,26 +7501,44 @@ def _plot_defensive_momentum(df: pd.DataFrame, critical: pd.Series | None):
             name="Momentum defensivo",
         )
     )
+    def _event_flag(column: str) -> pd.Series:
+        return pd.to_numeric(df.get(column, pd.Series(0, index=df.index)), errors="coerce").fillna(0).gt(0)
+
+    goal_mask = _event_flag("es_gol")
+    shot_on_target_mask = _event_flag("tipo_finalizacion_tiro_puerta") & ~goal_mask
+    shot_mask = _event_flag("tipo_finalizacion_tiro") & ~shot_on_target_mask & ~goal_mask
     marker_specs = [
-        ("tipo_finalizacion_tiro", "Tiro", "circle", "#ffffff", 10),
-        ("tipo_finalizacion_tiro_puerta", "Tiro a puerta", "diamond", "#57a0ff", 12),
-        ("es_gol", "Gol", "star", "#ff405c", 15),
+        ("Tiro", shot_mask, "#2ea05a", 22, 0.026),
+        ("Tiro a puerta", shot_on_target_mask, "#f2c94c", 24, 0.034),
+        ("Gol", goal_mask, "#c8102e", 26, 0.042),
     ]
-    for col, label, symbol, color, size in marker_specs:
-        if col not in df.columns:
-            continue
-        events = df[pd.to_numeric(df[col], errors="coerce").fillna(0).gt(0)].copy()
+    for label, mask, ring_color, size, y_offset in marker_specs:
+        events = df[mask].copy()
         if events.empty:
-            continue
-        y_vals = np.interp(events["minuto_partido"], timeline["minuto"], timeline["momentum"])
+            x_vals = [None]
+            y_vals = [None]
+            text_vals = [""]
+        else:
+            x_vals = events["minuto_partido"]
+            y_vals = np.interp(events["minuto_partido"], timeline["minuto"], timeline["momentum"]) + y_offset
+            text_vals = ["⚽"] * len(events)
         fig.add_trace(
             go.Scatter(
-                x=events["minuto_partido"],
-                y=y_vals + 0.035,
-                mode="markers",
-                marker=dict(symbol=symbol, color=color, size=size, line=dict(color="#202532", width=1.2)),
+                x=x_vals,
+                y=y_vals,
+                mode="markers+text",
+                marker=dict(
+                    symbol="circle",
+                    color="#f8fafc",
+                    size=size,
+                    line=dict(color=ring_color, width=4),
+                ),
+                text=text_vals,
+                textfont=dict(size=max(10, size - 8), color="#111827"),
+                textposition="middle center",
                 name=label,
                 hovertemplate=f"{label}<br>Minuto %{{x:.1f}}<extra></extra>",
+                showlegend=True,
             )
         )
     fig.update_layout(title="Curva de momentum defensivo (EWMA)", height=420, showlegend=True, legend=dict(orientation="h", y=-0.22, x=0))

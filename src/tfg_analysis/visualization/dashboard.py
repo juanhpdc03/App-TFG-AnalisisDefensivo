@@ -6,6 +6,7 @@ from collections.abc import Mapping
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
 import matplotlib.patches as patches
+from matplotlib.lines import Line2D
 import numpy as np
 import pandas as pd
 from scipy.ndimage import gaussian_filter
@@ -332,24 +333,55 @@ def plot_evolucion_temporal_con_tiros(df_def_dinamico: pd.DataFrame, secuencias:
     ax.fill_between(timeline["minuto"], timeline["momentum"], 0, color="#f4f6fb", alpha=0.08)
     ax.plot(timeline["minuto"], timeline["momentum"], color="#f4f6fb", lw=3.2, label="Momentum defensivo")
     if not df.empty:
-        tiros = df[pd.to_numeric(df.get("tipo_finalizacion_tiro", pd.Series(0, index=df.index)), errors="coerce").fillna(0).gt(0)].copy()
-        if not tiros.empty:
-            minuto_tiro = np.where(
-                tiros.get("match_time_tiro_oficial", pd.Series(np.nan, index=tiros.index)).notna(),
-                tiros["match_time_tiro_oficial"] / 60000,
-                tiros["minuto_partido"],
+        def _event_flag(column: str) -> pd.Series:
+            return pd.to_numeric(df.get(column, pd.Series(0, index=df.index)), errors="coerce").fillna(0).gt(0)
+
+        def _event_minutes(events: pd.DataFrame) -> np.ndarray:
+            official = events.get("match_time_tiro_oficial", pd.Series(np.nan, index=events.index))
+            return np.where(official.notna(), official / 60000, events["minuto_partido"])
+
+        def _draw_ball_events(events: pd.DataFrame, ring_color: str, size: int, y_offset: float):
+            if events.empty:
+                return
+            minutes = _event_minutes(events)
+            y_vals = np.interp(minutes, timeline["minuto"], timeline["momentum"]) + y_offset
+            ax.scatter(
+                minutes,
+                y_vals,
+                s=size,
+                marker="o",
+                facecolors="#f8fafc",
+                edgecolors=ring_color,
+                linewidths=3.0,
+                zorder=5,
             )
-            y_vals = np.interp(minuto_tiro, timeline["minuto"], timeline["momentum"])
-            ax.scatter(minuto_tiro, y_vals + 0.018, s=82, facecolors="white", edgecolors="#111827", linewidths=1.3, label="Tiro")
-            tiros_pt = tiros[pd.to_numeric(tiros.get("tipo_finalizacion_tiro_puerta", pd.Series(0, index=tiros.index)), errors="coerce").fillna(0).gt(0)]
-            if not tiros_pt.empty:
-                minuto_pt = np.where(
-                    tiros_pt.get("match_time_tiro_oficial", pd.Series(np.nan, index=tiros_pt.index)).notna(),
-                    tiros_pt["match_time_tiro_oficial"] / 60000,
-                    tiros_pt["minuto_partido"],
-                )
-                y_pt = np.interp(minuto_pt, timeline["minuto"], timeline["momentum"])
-                ax.scatter(minuto_pt, y_pt + 0.032, s=118, facecolors="none", edgecolors="#57a0ff", linewidths=2.2, label="Tiro a puerta")
+            ax.scatter(
+                minutes,
+                y_vals,
+                s=size * 0.20,
+                marker="p",
+                facecolors="#111827",
+                edgecolors="#111827",
+                linewidths=0.4,
+                zorder=6,
+            )
+            ax.scatter(
+                minutes,
+                y_vals,
+                s=size * 0.055,
+                marker="o",
+                facecolors="#f8fafc",
+                edgecolors="#f8fafc",
+                linewidths=0.2,
+                zorder=7,
+            )
+
+        goal_mask = _event_flag("es_gol")
+        shot_on_target_mask = _event_flag("tipo_finalizacion_tiro_puerta") & ~goal_mask
+        shot_mask = _event_flag("tipo_finalizacion_tiro") & ~shot_on_target_mask & ~goal_mask
+        _draw_ball_events(df[shot_mask].copy(), "#2ea05a", 135, 0.018)
+        _draw_ball_events(df[shot_on_target_mask].copy(), "#f2c94c", 160, 0.030)
+        _draw_ball_events(df[goal_mask].copy(), "#c8102e", 190, 0.042)
     ax.text(1, MOMENTUM_ALERT_THRESHOLD / 2, "CONTROLADO", color="#8ee1ad", fontsize=10, weight="bold", va="center")
     ax.text(1, (MOMENTUM_ALERT_THRESHOLD + MOMENTUM_STRESS_THRESHOLD) / 2, "ALERTA", color="#f2c94c", fontsize=10, weight="bold", va="center")
     ax.text(1, min(ymax - 0.02, MOMENTUM_STRESS_THRESHOLD + 0.04), "ESTRES ALTO", color="#ff8a9b", fontsize=10, weight="bold", va="center")
@@ -364,7 +396,13 @@ def plot_evolucion_temporal_con_tiros(df_def_dinamico: pd.DataFrame, secuencias:
     ax.grid(color="white", alpha=0.10)
     for spine in ax.spines.values():
         spine.set_color("#5f6b7d")
-    legend = ax.legend(loc="upper right", frameon=True)
+    legend_handles = [
+        Line2D([0], [0], color="#f4f6fb", lw=3.2, label="Momentum defensivo"),
+        Line2D([0], [0], marker="o", linestyle="None", markerfacecolor="#f8fafc", markeredgecolor="#2ea05a", markeredgewidth=3, markersize=11, label="Tiro"),
+        Line2D([0], [0], marker="o", linestyle="None", markerfacecolor="#f8fafc", markeredgecolor="#f2c94c", markeredgewidth=3, markersize=12, label="Tiro a puerta"),
+        Line2D([0], [0], marker="o", linestyle="None", markerfacecolor="#f8fafc", markeredgecolor="#c8102e", markeredgewidth=3, markersize=13, label="Gol"),
+    ]
+    legend = ax.legend(handles=legend_handles, loc="upper right", frameon=True)
     legend.get_frame().set_facecolor("#1b2433")
     legend.get_frame().set_edgecolor("#5f6b7d")
     for text in legend.get_texts():
