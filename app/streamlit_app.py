@@ -61,8 +61,8 @@ BEPRO_MATCH_URL_TEMPLATE_DEFAULT = (
 )
 BEPRO_API_BASE = "https://d.bepro11.com/api"
 BEPRO_LIBRARY_URL_TEMPLATE_DEFAULT = "https://space.bepro.ai/center/library/me/root"
-GEMINI_API_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-GEMINI_MODEL_DEFAULT = "gemini-2.5-flash"
+OLLAMA_BASE_URL_DEFAULT = "http://localhost:11434"
+OLLAMA_MODEL_DEFAULT = "llama3.1"
 APP_USERS = {
     "entrenador": "subiza2026",
     "juan": "subiza2026",
@@ -82,6 +82,37 @@ REGISTERED_TEAMS = {
         "access_code": "subiza2026",
     }
 }
+
+
+def _clean_app_text(value):
+    if value is None:
+        return value
+    if not isinstance(value, str):
+        return value
+    text = value
+    for _ in range(3):
+        if not any(mark in text for mark in ("Ã", "Â", "\x8d", "\x81")):
+            break
+        repaired = None
+        for encoding in ("latin1", "cp1252"):
+            try:
+                repaired = text.encode(encoding).decode("utf-8")
+                break
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+        if not repaired or repaired == text:
+            break
+        text = repaired
+    return text.replace("Â", "").replace("�", "")
+
+
+def _clean_text_columns(df: pd.DataFrame) -> pd.DataFrame:
+    if df.empty:
+        return df
+    out = df.copy()
+    for col in out.select_dtypes(include=["object", "string"]).columns:
+        out[col] = out[col].map(_clean_app_text)
+    return out
 APP_COLOR_SEQUENCE = ["#c8102e", "#2453a6", "#f2c94c", "#ead7a4", "#6b7280"]
 APP_COLOR_MAP = {
     "T0": "#c8102e",
@@ -672,10 +703,29 @@ def inject_style():
             border-radius: 8px !important;
             color: #dbe3f3 !important;
             min-height: 54px !important;
-            padding: 14px 16px !important;
+            padding: 14px 16px 14px 54px !important;
             box-shadow: 0 12px 26px rgba(0,0,0,0.18) !important;
             position: relative !important;
             overflow: hidden !important;
+        }
+        div[data-testid="stExpander"] details > summary::before {
+            content: "+" !important;
+            position: absolute !important;
+            left: 18px !important;
+            top: 50% !important;
+            transform: translateY(-50%) !important;
+            width: 24px !important;
+            height: 24px !important;
+            border-radius: 999px !important;
+            background: var(--osasuna-red) !important;
+            color: #ffffff !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-size: 18px !important;
+            font-weight: 950 !important;
+            line-height: 1 !important;
+            box-shadow: 0 8px 18px rgba(200,16,46,0.28) !important;
         }
         div[data-testid="stExpander"] details > summary::after {
             content: none !important;
@@ -2803,14 +2853,14 @@ def _load_table(match_id: int, filename: str) -> pd.DataFrame:
     path = _paths().outputs_dir / "app_data" / str(int(match_id)) / filename
     if not path.exists():
         return pd.DataFrame()
-    return _read_csv_cached(str(path), _path_mtime(path))
+    return _clean_text_columns(_read_csv_cached(str(path), _path_mtime(path)))
 
 
 def _load_bepro_video_index() -> pd.DataFrame:
     path = _paths().outputs_dir / "app_data" / "bepro_videos.csv"
     if not path.exists():
         return pd.DataFrame()
-    return _read_csv_cached(str(path), _path_mtime(path))
+    return _clean_text_columns(_read_csv_cached(str(path), _path_mtime(path)))
 
 
 def _load_text(match_id: int, filename: str) -> str:
@@ -3883,9 +3933,9 @@ def _cause_label(value) -> str:
     mapping = {
         "estructura_retroceso": "problemas de repliegue",
         "estructura_anchura": "bloque demasiado abierto",
-        "presion_distancia": "poca presiÃ³n al balÃ³n",
+        "presion_distancia": "poca presión al balón",
         "pitch_control_rival": "dominio rival en zonas peligrosas",
-        "presion_distancia": "poca presiÃ³n sobre poseedor",
+        "presion_distancia": "poca presión sobre poseedor",
         "sin etiqueta": "sin causa dominante",
     }
     return mapping.get(text, text.replace("_", " ") if text and text != "nan" else "-")
@@ -3896,8 +3946,8 @@ def _sequence_type_label(value) -> str:
     mapping = {
         "ataque_elaborado": "Ataque posicional",
         "juego_directo": "Juego directo vertical",
-        "transicion_rapida": "TransiciÃ³n tras robo",
-        "balon_parado_con_continuidad": "BalÃ³n parado con continuidad",
+        "transicion_rapida": "Transición tras robo",
+        "balon_parado_con_continuidad": "Balón parado con continuidad",
         "descartada": "Secuencia descartada",
     }
     return mapping.get(text, text.replace("_", " ").capitalize() if text and text != "nan" else "-")
@@ -3917,20 +3967,20 @@ def _pattern_name(cluster_row: pd.Series, seq_cluster: pd.DataFrame | None = Non
     elif dominant_type == "juego_directo":
         base = "Juego directo vertical"
     elif dominant_type == "balon_parado_con_continuidad":
-        base = "BalÃ³n parado con segunda jugada"
+        base = "Balón parado con segunda jugada"
     elif dominant_type == "ataque_elaborado":
         if "central" in lane_lower:
-            base = "CirculaciÃ³n posicional interior"
+            base = "Circulación posicional interior"
         elif "banda" in lane_lower:
             base = f"Ataques por {_lower_first(lane)}"
         else:
-            base = "CirculaciÃ³n posicional en U"
+            base = "Circulación posicional en U"
     elif pd.notna(tiro_pct) and tiro_pct >= 25:
         base = "Tipología de finalización frecuente"
     elif pd.notna(ipar) and ipar >= 0.55:
         base = "Tipología de alta amenaza"
     else:
-        base = "Ataques de progresiÃ³n controlada"
+        base = "Ataques de progresión controlada"
     suffix = _zone_lane_suffix(cluster_row)
     if suffix != "Zona no identificada":
         return _sentence_label(f"{base} - {suffix}")
@@ -3976,7 +4026,7 @@ def _apply_tactical_labels(seq: pd.DataFrame, clusters: pd.DataFrame) -> tuple[p
             seq["causa_tactica"] = seq["tipo_desorganizacion_principal"].apply(_cause_label)
         if "tipo_secuencia_ofensiva" in seq.columns:
             seq["tipo_secuencia_label"] = seq["tipo_secuencia_ofensiva"].apply(_sequence_type_label)
-    return seq, clusters, label_map
+    return _clean_text_columns(seq), _clean_text_columns(clusters), label_map
 
 
 def _prepare_app_data(match_id: int, meta: dict) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, dict]:
@@ -3990,7 +4040,7 @@ def _prepare_app_data(match_id: int, meta: dict) -> tuple[pd.DataFrame, pd.DataF
             zona["zona_ataque"] = zona["zona_ataque"].apply(_lane_label)
         if "cluster_trayectoria" in zona.columns:
             zona["patron_tactico"] = zona["cluster_trayectoria"].map(lambda v: label_map.get(int(float(v)), "Tipología sin etiquetar") if pd.notna(v) else "Tipología sin etiquetar")
-    return seq, clusters, zona, label_map
+    return _clean_text_columns(seq), _clean_text_columns(clusters), _clean_text_columns(zona), label_map
 
 
 def _add_pitch_shapes(fig: go.Figure):
@@ -4848,9 +4898,10 @@ def _summary_combo_card_html(items: list[tuple[str, object]]) -> str:
 
 
 def _info_tip_html(text: str) -> str:
-    raw_lines = [line.strip(" -\t") for line in str(text).splitlines() if line.strip()]
+    text = str(_clean_app_text(text) or "")
+    raw_lines = [line.strip(" -\t") for line in text.splitlines() if line.strip()]
     if not raw_lines:
-        raw_lines = [str(text).strip()]
+        raw_lines = [text.strip()]
     rows_source = raw_lines[:]
     rows = []
     for idx, line in enumerate(rows_source):
@@ -4870,8 +4921,8 @@ def _info_tip_html(text: str) -> str:
             row_class += " glossary-row"
         rows.append(
             f'<span class="{row_class}">'
-            f"<b>{html.escape(label)}</b>"
-            f"<span>{html.escape(body)}</span>"
+            f"<b>{html.escape(str(_clean_app_text(label) or label))}</b>"
+            f"<span>{html.escape(str(_clean_app_text(body) or body))}</span>"
             "</span>"
         )
     return (
@@ -4885,6 +4936,8 @@ def _info_tip_html(text: str) -> str:
 
 
 def _section_intro(title: str, body: str):
+    title = str(_clean_app_text(title) or "")
+    body = str(_clean_app_text(body) or "")
     st.markdown(
         f"""
         <div class="section-intro">
@@ -4897,19 +4950,23 @@ def _section_intro(title: str, body: str):
 
 
 def _page_heading(title: str):
+    title = str(_clean_app_text(title) or "")
     st.markdown(f'<h2 class="app-page-heading">{html.escape(title)}</h2>', unsafe_allow_html=True)
 
 
 def _subsection_heading(title: str):
+    title = str(_clean_app_text(title) or "")
     st.markdown(f'<h3 class="app-subsection-heading">{html.escape(title)}</h3>', unsafe_allow_html=True)
 
 
 def _selected_heading(title: str):
+    title = str(_clean_app_text(title) or "")
     st.markdown(f'<h4 class="app-selected-heading">{html.escape(title)}</h4>', unsafe_allow_html=True)
 
 
 def _info_heading(title: str, info: str, level: int = 3):
     tag = "h4" if level >= 4 else "h3"
+    title = str(_clean_app_text(title) or "")
     st.markdown(
         f'<div class="section-info-heading"><{tag}>{html.escape(title)}</{tag}>{_info_tip_html(info)}</div>',
         unsafe_allow_html=True,
@@ -4918,12 +4975,7 @@ def _info_heading(title: str, info: str, level: int = 3):
 
 def _display_text(value) -> str:
     text = str(value if value is not None else "-")
-    if "Ã" in text or "Â" in text:
-        try:
-            return text.encode("latin1").decode("utf-8")
-        except (UnicodeEncodeError, UnicodeDecodeError):
-            return text
-    return text
+    return str(_clean_app_text(text) or "-")
 
 
 def _summary_group_html(title: str, items: list[tuple[str, object] | list[tuple[str, object]]], cols: int = 2, note: str = "") -> str:
@@ -5035,31 +5087,8 @@ def _summary_family_prompt(metrics_json: str) -> str:
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def _call_gemini_summary_notes_cached(metrics_json: str) -> dict[str, str]:
-    api_key = _gemini_api_key()
-    if not api_key:
-        raise RuntimeError("No hay GEMINI_API_KEY configurada.")
-    model = _gemini_model()
-    url = GEMINI_API_URL_TEMPLATE.format(model=model)
-    body = {
-        "contents": [{"parts": [{"text": _summary_family_prompt(metrics_json)}]}],
-        "generationConfig": {
-            "temperature": 0.18,
-            "topP": 0.85,
-            "maxOutputTokens": 900,
-            "responseMimeType": "application/json",
-        },
-    }
-    response = requests.post(
-        url,
-        headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-        json=body,
-        timeout=30,
-    )
-    response.raise_for_status()
-    data = response.json()
-    parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-    text = "\n".join(part.get("text", "") for part in parts).strip()
+def _call_ollama_summary_notes_cached(metrics_json: str) -> dict[str, str]:
+    text = _call_ollama_report(_summary_family_prompt(metrics_json))
     start = text.find("{")
     end = text.rfind("}")
     if start >= 0 and end >= start:
@@ -5076,10 +5105,10 @@ def _summary_family_notes(metric_map: dict[str, object]) -> dict[str, str]:
         sort_keys=True,
     )
     try:
-        gemini_notes = _call_gemini_summary_notes_cached(metrics_json)
+        ollama_notes = _call_ollama_summary_notes_cached(metrics_json)
     except Exception:
         return fallback
-    return {title: gemini_notes.get(title) or fallback[title] for title in SUMMARY_FAMILY_TITLES}
+    return {title: ollama_notes.get(title) or fallback[title] for title in SUMMARY_FAMILY_TITLES}
 
 
 def _render_summary_metric_blocks(metrics: list[tuple[str, object]]):
@@ -5343,8 +5372,8 @@ def _load_sequence_detail(match_id: int, meta: dict) -> pd.DataFrame:
         if df["es_gol"].dtype == bool:
             df["es_gol"] = df["es_gol"].astype(int)
         else:
-            df["es_gol"] = df["es_gol"].astype(str).str.lower().isin({"true", "1", "si", "sÃ­", "yes"}).astype(int)
-    return df
+            df["es_gol"] = df["es_gol"].map(_clean_app_text).astype(str).str.lower().isin({"true", "1", "si", "sí", "yes"}).astype(int)
+    return _clean_text_columns(df)
 
 
 def _tipology_options(df: pd.DataFrame) -> list[str]:
@@ -7134,7 +7163,7 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         narrative = f"La secuencia obligó a {team_name} a replegar con urgencia y elevó la desorganización del bloque."
     elif causa == "bloque demasiado abierto":
         narrative = "El rival encontró separación entre defensores y pudo atacar intervalos con más facilidad."
-    elif causa == "poca presion sobre poseedor" or causa == "poca presiÃ³n sobre poseedor":
+    elif causa == "poca presion sobre poseedor" or causa == "poca presión sobre poseedor":
         narrative = "El poseedor rival tuvo demasiado tiempo para orientar la accion y progresar."
     else:
         narrative = "La secuencia combina ruptura estructural y amenaza suficiente para ser revisada en vídeo."
@@ -7541,8 +7570,32 @@ def _plot_defensive_momentum(df: pd.DataFrame, critical: pd.Series | None):
                 showlegend=True,
             )
         )
-    fig.update_layout(title="Curva de momentum defensivo (EWMA)", height=420, showlegend=True, legend=dict(orientation="h", y=-0.22, x=0))
+    fig.update_layout(
+        title="Curva de momentum defensivo (EWMA)",
+        height=420,
+        showlegend=True,
+        legend=dict(
+            orientation="h",
+            y=-0.22,
+            x=0,
+            font=dict(color="#f4f6fb", size=13),
+            bgcolor="rgba(32,37,50,0.82)",
+            bordercolor="rgba(255,255,255,0.16)",
+            borderwidth=1,
+        ),
+    )
     _apply_plotly_theme(fig)
+    fig.update_layout(
+        legend=dict(
+            orientation="h",
+            y=-0.22,
+            x=0,
+            font=dict(color="#f4f6fb", size=13),
+            bgcolor="rgba(32,37,50,0.82)",
+            bordercolor="rgba(255,255,255,0.16)",
+            borderwidth=1,
+        )
+    )
     fig.update_xaxes(title="Minuto de partido", range=[0, max_minute])
     fig.update_yaxes(title="Presion acumulada", range=[0, y_upper])
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
@@ -7977,14 +8030,14 @@ def render_danio(match_id: int, meta: dict):
 
 def _top_pattern_text(seq: pd.DataFrame, metric: str, min_rows: int = 2) -> str:
     if seq.empty or "tipologia" not in seq.columns or metric not in seq.columns:
-        return "patrÃ³n no identificado"
+        return "patrón no identificado"
     grouped = (
         seq.groupby("tipologia", as_index=False)
         .agg(valor=(metric, "mean"), secuencias=("secuencia_rival_id", "count"))
         .query("secuencias >= @min_rows")
     )
     if grouped.empty:
-        return "patrÃ³n no identificado"
+        return "patrón no identificado"
     row = grouped.sort_values("valor", ascending=False).iloc[0]
     return f"{row['tipologia']} ({row['valor']:.2f})"
 
@@ -8026,7 +8079,7 @@ def _report_payload(match_id: int, meta: dict) -> dict:
     rival = str(meta.get("rival_name", "Rival"))
     teams = _presentation_teams(match_id, meta)
     if seq.empty:
-        return {"match_id": int(match_id), "rival": rival, "error": "No hay secuencias suficientes para generar informe tÃ¡ctico."}
+        return {"match_id": int(match_id), "rival": rival, "error": "No hay secuencias suficientes para generar informe táctico."}
 
     pattern_summary = pd.DataFrame()
     if "tipologia" in seq.columns:
@@ -8203,83 +8256,83 @@ def _fallback_tactical_report(payload: dict) -> str:
         f"| {t.get('tramo')} | {t.get('secuencias')} | {t.get('ddi_medio')} | {t.get('ipar_medio')} | {t.get('tiros')} | {t.get('goles')} |"
         for t in payload.get("analisis_temporal", [])
     )
-    return f"""# Informe tÃ¡ctico postpartido: {equipo} vs {rival}
+    return f"""# Informe táctico postpartido: {equipo} vs {rival}
 
 ## 1. Resumen general
-El rival generÃ³ **{metrics['secuencias_rivales']} secuencias ofensivas evaluables**, con **{metrics['tiros']} tiros**, **{metrics['tiros_puerta']} a puerta** y **{metrics['goles']} goles asociados**. La desorganizaciÃ³n defensiva media fue **IDD {metrics['ddi_medio']}** y la peligrosidad media fue **IPO {metrics['ipar_medio']}**. Hubo **{metrics['secuencias_alta_amenaza']} secuencias de alta amenaza**.
+El rival generó **{metrics['secuencias_rivales']} secuencias ofensivas evaluables**, con **{metrics['tiros']} tiros**, **{metrics['tiros_puerta']} a puerta** y **{metrics['goles']} goles asociados**. La desorganización defensiva media fue **IDD {metrics['ddi_medio']}** y la peligrosidad media fue **IPO {metrics['ipar_medio']}**. Hubo **{metrics['secuencias_alta_amenaza']} secuencias de alta amenaza**.
 
-La zona mÃ¡s daÃ±ada fue **{metrics['zona_mas_danada']}** y el tramo con mayor volumen rival fue **{metrics['tramo_mas_atacado']}**.
+La zona más dañada fue **{metrics['zona_mas_danada']}** y el tramo con mayor volumen rival fue **{metrics['tramo_mas_atacado']}**.
 
-## 2. TipologÃ­as de ataque rival
-El patrÃ³n mÃ¡s repetido fue **{top_freq}**. El patrÃ³n mÃ¡s peligroso por IPO medio fue **{top_danger}**. El patrÃ³n que mÃ¡s desorganizÃ³ al bloque fue **{top_ddi}**.
+## 2. Tipologías de ataque rival
+El patrón más repetido fue **{top_freq}**. El patrón más peligroso por IPO medio fue **{top_danger}**. El patrón que más desorganizó al bloque fue **{top_ddi}**.
 
-| PatrÃ³n ofensivo | Secuencias | IDD medio | IPO medio | Tiros | Goles |
+| Patrón ofensivo | Secuencias | IDD medio | IPO medio | Tiros | Goles |
 |---|---:|---:|---:|---:|---:|
 {pattern_lines}
 
-## 3. OrganizaciÃ³n defensiva de {equipo}
-La causa defensiva mÃ¡s frecuente fue **{cause_txt}**. La lectura principal es que el equipo debe priorizar ajustes en protecciÃ³n de espacios, presiÃ³n al poseedor y respuesta tras pÃ©rdida o reinicio, especialmente en los patrones con IDD alto.
+## 3. Organización defensiva de {equipo}
+La causa defensiva más frecuente fue **{cause_txt}**. La lectura principal es que el equipo debe priorizar ajustes en protección de espacios, presión al poseedor y respuesta tras pérdida o reinicio, especialmente en los patrones con IDD alto.
 
-## 4. Jugadas crÃ­ticas
+## 4. Jugadas críticas
 {critical_lines}
 
-## 5. AnÃ¡lisis temporal
+## 5. Análisis temporal
 | Tramo | Secuencias | IDD medio | IPO medio | Tiros | Goles |
 |---|---:|---:|---:|---:|---:|
 {temporal_lines}
 
 ## 6. Conclusiones operativas
-- Revisar en vÃ­deo las secuencias con IDD e IPO altos, no solo las que terminan en tiro.
-- Ajustar la protecciÃ³n de la zona mÃ¡s daÃ±ada: **{metrics['zona_mas_danada']}**.
-- Preparar una correcciÃ³n especÃ­fica para **{top_danger}**, por ser el patrÃ³n que mÃ¡s amenaza genera.
-- Reforzar mecanismos de reorganizaciÃ³n tras pÃ©rdida cuando aparezcan transiciones o ataques directos.
+- Revisar en vídeo las secuencias con IDD e IPO altos, no solo las que terminan en tiro.
+- Ajustar la protección de la zona más dañada: **{metrics['zona_mas_danada']}**.
+- Preparar una corrección específica para **{top_danger}**, por ser el patrón que más amenaza genera.
+- Reforzar mecanismos de reorganización tras pérdida cuando aparezcan transiciones o ataques directos.
 """
 
 
-def _gemini_api_key() -> str | None:
+def _ollama_api_key() -> str | None:
     try:
-        secret_value = st.secrets.get("GEMINI_API_KEY")
+        secret_value = st.secrets.get("OLLAMA_API_KEY")
     except Exception:
         secret_value = None
-    return os.getenv("GEMINI_API_KEY") or secret_value
+    return os.getenv("OLLAMA_API_KEY") or secret_value
 
 
-def _gemini_model() -> str:
+def _ollama_model() -> str:
     try:
-        secret_value = st.secrets.get("GEMINI_MODEL")
+        secret_value = st.secrets.get("OLLAMA_MODEL")
     except Exception:
         secret_value = None
-    return os.getenv("GEMINI_MODEL") or secret_value or GEMINI_MODEL_DEFAULT
+    return os.getenv("OLLAMA_MODEL") or secret_value or OLLAMA_MODEL_DEFAULT
 
 
-def _gemini_prompt(payload: dict) -> str:
+def _ollama_prompt(payload: dict) -> str:
     equipo = payload.get("equipo", "equipo analizado")
     return (
-        f"ActÃºa como analista tÃ¡ctico profesional de {equipo}. "
+        f"Actúa como analista táctico profesional de {equipo}. "
         "Genera un informe postpartido completo, claro, accionable y listo para imprimir. "
-        "No inventes datos que no estÃ©n en el JSON. Si falta un dato, dilo de forma prudente. "
-        "Traduce IDD, IPO, pitch control y xT a lenguaje tÃ¡ctico comprensible para entrenador. "
+        "No inventes datos que no estén en el JSON. Si falta un dato, dilo de forma prudente. "
+        "Traduce IDD, IPO, pitch control y xT a lenguaje táctico comprensible para entrenador. "
         "Estructura obligatoria en Markdown:\n"
         "1. Resumen general\n"
-        "2. TipologÃ­as de ataque rival\n"
-        f"3. OrganizaciÃ³n defensiva de {equipo}\n"
-        "4. Jugadas crÃ­ticas prioritarias\n"
-        "5. AnÃ¡lisis temporal del partido\n"
+        "2. Tipologías de ataque rival\n"
+        f"3. Organización defensiva de {equipo}\n"
+        "4. Jugadas críticas prioritarias\n"
+        "5. Análisis temporal del partido\n"
         "6. Conclusiones y tareas defensivas a mejorar\n\n"
-        "Incluye tablas Markdown solo cuando ayuden a resumir patrones, tramos o secuencias crÃ­ticas. "
-        "El tono debe ser tÃ©cnico, directo y Ãºtil para un entrenador con poco tiempo.\n\n"
+        "Incluye tablas Markdown solo cuando ayuden a resumir patrones, tramos o secuencias críticas. "
+        "El tono debe ser técnico, directo y útil para un entrenador con poco tiempo.\n\n"
         f"JSON DEL PARTIDO:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
 
 
-def _call_gemini_report(payload: dict) -> str:
-    api_key = _gemini_api_key()
+def _call_ollama_report(payload: dict) -> str:
+    api_key = _ollama_api_key()
     if not api_key:
-        raise RuntimeError("No hay GEMINI_API_KEY configurada.")
-    model = _gemini_model()
-    url = GEMINI_API_URL_TEMPLATE.format(model=model)
+        raise RuntimeError("No hay OLLAMA_API_KEY configurada.")
+    model = _ollama_model()
+    url = OLLAMA_API_URL_TEMPLATE.format(model=model)
     body = {
-        "contents": [{"parts": [{"text": _gemini_prompt(payload)}]}],
+        "contents": [{"parts": [{"text": _ollama_prompt(payload)}]}],
         "generationConfig": {"temperature": 0.25, "topP": 0.9, "maxOutputTokens": 8192},
     }
     response = requests.post(url, headers={"x-goog-api-key": api_key, "Content-Type": "application/json"}, json=body, timeout=90)
@@ -8288,18 +8341,18 @@ def _call_gemini_report(payload: dict) -> str:
     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     text = "\n".join(part.get("text", "") for part in parts).strip()
     if not text:
-        raise RuntimeError("Gemini no devolviÃ³ texto para el informe.")
+        raise RuntimeError("Ollama no devolvió texto para el informe.")
     return text
 
 
-def _generate_tactical_report(match_id: int, meta: dict, use_gemini: bool = False) -> tuple[str, dict, str]:
+def _generate_tactical_report(match_id: int, meta: dict, use_ollama: bool = False) -> tuple[str, dict, str]:
     payload = _report_payload(match_id, meta)
-    if use_gemini:
+    if use_ollama:
         try:
-            return _call_gemini_report(payload), payload, "gemini"
+            return _call_ollama_report(payload), payload, "ollama"
         except Exception as exc:
             fallback = _fallback_tactical_report(payload)
-            return f"{fallback}\n\n> Aviso: no se pudo generar con Gemini ({exc}). Se muestra informe determinista.", payload, "fallback"
+            return f"{fallback}\n\n> Aviso: no se pudo generar con Ollama ({exc}). Se muestra informe determinista.", payload, "fallback"
     return _fallback_tactical_report(payload), payload, "fallback"
 
 
@@ -8360,14 +8413,14 @@ def _markdown_to_pdf_bytes(markdown_text: str, title: str) -> bytes:
 
 def _legacy_tactical_report_unused(match_id: int, meta: dict) -> str:
     if seq.empty:
-        return "No hay secuencias suficientes para generar informe tÃ¡ctico."
+        return "No hay secuencias suficientes para generar informe táctico."
     resumen = meta.get("resumen", {})
     rival = str(meta.get("rival_name", "Rival"))
     team_name = str(meta.get("team_name", "el equipo analizado"))
     ddi = pd.to_numeric(seq.get("indice_desorganizacion"), errors="coerce").mean()
     ipar = pd.to_numeric(seq.get("indice_peligrosidad_accion"), errors="coerce").mean()
     high = int(pd.to_numeric(seq.get("indice_peligrosidad_accion"), errors="coerce").gt(0.75).sum())
-    top_freq = seq["tipologia"].mode().iloc[0] if "tipologia" in seq.columns and not seq["tipologia"].mode().empty else "patrÃ³n no identificado"
+    top_freq = seq["tipologia"].mode().iloc[0] if "tipologia" in seq.columns and not seq["tipologia"].mode().empty else "patrón no identificado"
     top_danger = _top_pattern_text(seq, "indice_peligrosidad_accion")
     top_ddi = _top_pattern_text(seq, "indice_desorganizacion")
     cause = seq.get("causa_tactica", pd.Series(dtype=str)).mode()
@@ -8383,33 +8436,33 @@ def _legacy_tactical_report_unused(match_id: int, meta: dict) -> str:
             f"Tiro/a puerta/gol: {int(row.get('tipo_finalizacion_tiro', 0))}/"
             f"{int(row.get('tipo_finalizacion_tiro_puerta', 0))}/{int(row.get('es_gol', 0))}."
         )
-    strengths = f"{team_name} contuvo varias posesiones sin finalizaciÃ³n clara" if _sum_numeric(seq, "tipo_finalizacion_tiro") < resumen.get("tiros_rival", 0) else f"{team_name} redujo parte de la amenaza antes del remate final"
+    strengths = f"{team_name} contuvo varias posesiones sin finalización clara" if _sum_numeric(seq, "tipo_finalizacion_tiro") < resumen.get("tiros_rival", 0) else f"{team_name} redujo parte de la amenaza antes del remate final"
     return f"""
 ### 1. Resumen ejecutivo
-El rival analizado, **{rival}**, activÃ³ **{len(seq)} secuencias ofensivas evaluables**. El comportamiento defensivo medio dejÃ³ un **IDD {ddi:.2f}** y un **IPO {ipar:.2f}**, con **{high} secuencias de alta amenaza**. El patrÃ³n mÃ¡s frecuente fue **{top_freq}**, mientras que el mÃ¡s peligroso fue **{top_danger}**.
+El rival analizado, **{rival}**, activó **{len(seq)} secuencias ofensivas evaluables**. El comportamiento defensivo medio dejó un **IDD {ddi:.2f}** y un **IPO {ipar:.2f}**, con **{high} secuencias de alta amenaza**. El patrón más frecuente fue **{top_freq}**, mientras que el más peligroso fue **{top_danger}**.
 
 ### 2. Identidad ofensiva del rival
-El rival generÃ³ mÃ¡s volumen a travÃ©s de **{top_freq}**. La amenaza no depende solo del nÃºmero de ataques: el patrÃ³n con mayor daÃ±o medio fue **{top_danger}**, lo que indica quÃ© tipo de acciÃ³n conviene preparar en vÃ­deo y charla.
+El rival generó más volumen a través de **{top_freq}**. La amenaza no depende solo del número de ataques: el patrón con mayor daño medio fue **{top_danger}**, lo que indica qué tipo de acción conviene preparar en vídeo y charla.
 
-### 3. DÃ³nde sufriÃ³ la defensa
-La causa defensiva dominante fue **{cause_txt}**. El patrÃ³n que mÃ¡s desorganizÃ³ al equipo fue **{top_ddi}**. Esto sugiere revisar especialmente la protecciÃ³n del espacio, la distancia al poseedor y la respuesta del bloque tras pÃ©rdida o reinicio.
+### 3. Dónde sufrió la defensa
+La causa defensiva dominante fue **{cause_txt}**. El patrón que más desorganizó al equipo fue **{top_ddi}**. Esto sugiere revisar especialmente la protección del espacio, la distancia al poseedor y la respuesta del bloque tras pérdida o reinicio.
 
 ### 4. Momentos del partido
-El tramo con mayor volumen ofensivo rival fue **{tramo}**, con **{tramo_n} secuencias**. Este intervalo debe revisarse junto con las secuencias crÃ­ticas para entender si el daÃ±o vino por fatiga, contexto de marcador, pÃ©rdidas o problemas de ajuste defensivo.
+El tramo con mayor volumen ofensivo rival fue **{tramo}**, con **{tramo_n} secuencias**. Este intervalo debe revisarse junto con las secuencias críticas para entender si el daño vino por fatiga, contexto de marcador, pérdidas o problemas de ajuste defensivo.
 
-### 5. Secuencias crÃ­ticas prioritarias
+### 5. Secuencias críticas prioritarias
 {chr(10).join(bullets)}
 
-### 6. ConclusiÃ³n operativa
-- Mejorar protecciÃ³n tras pÃ©rdida cuando el rival activa transiciones.
-- Reducir distancia entre lÃ­neas en acciones con {cause_txt}.
-- Priorizar la revisiÃ³n de vÃ­deo de **{top_danger}**.
+### 6. Conclusión operativa
+- Mejorar protección tras pérdida cuando el rival activa transiciones.
+- Reducir distancia entre líneas en acciones con {cause_txt}.
+- Priorizar la revisión de vídeo de **{top_danger}**.
 - Mantener como fortaleza: {strengths.lower()}.
 """
 
 
 def _short_pattern_name(value: object, max_len: int = 34) -> str:
-    text = str(value or "-").replace("_", " ")
+    text = str(_clean_app_text(value) or "-").replace("_", " ")
     return text if len(text) <= max_len else text[: max_len - 1].rstrip() + "."
 
 
@@ -8461,9 +8514,9 @@ def _deep_fallback_report_sections(payload: dict) -> dict[str, str]:
     }
 
 
-def _gemini_structured_report(payload: dict) -> dict[str, str]:
+def _ollama_structured_report(payload: dict) -> dict[str, str]:
     fallback = _deep_fallback_report_sections(payload)
-    api_key = _gemini_api_key()
+    api_key = _ollama_api_key()
     if not api_key:
         return fallback
     equipo = payload.get("equipo", "equipo analizado")
@@ -8476,8 +8529,8 @@ def _gemini_structured_report(payload: dict) -> dict[str, str]:
         f"JSON:\n{json.dumps(payload, ensure_ascii=False)}"
     )
     try:
-        model = _gemini_model()
-        url = GEMINI_API_URL_TEMPLATE.format(model=model)
+        model = _ollama_model()
+        url = OLLAMA_API_URL_TEMPLATE.format(model=model)
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.25, "topP": 0.9, "maxOutputTokens": 4096},
@@ -8562,7 +8615,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
         raise RuntimeError(payload["error"])
-    analysis = _gemini_structured_report(payload)
+    analysis = _ollama_structured_report(payload)
     seq, clusters, _, _ = _prepare_app_data(match_id, meta)
     clusters_display = _clusters_for_display(clusters)
     riesgo = _load_table(match_id, meta["tables"].get("riesgo_resumen", "riesgo_resumen.csv"))
@@ -8664,9 +8717,9 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 
 def render_informe(match_id: int, meta: dict):
     _page_heading("Informe táctico automático")
-    report_key = f"gemini_report_{match_id}"
-    source_key = f"gemini_report_source_{match_id}"
-    payload_key = f"gemini_report_payload_{match_id}"
+    report_key = f"ollama_report_{match_id}"
+    source_key = f"ollama_report_source_{match_id}"
+    payload_key = f"ollama_report_payload_{match_id}"
 
     st.caption(
         "Genera un informe imprimible a partir de las metricas del partido: resumen, patrones ofensivos, "
@@ -8675,11 +8728,11 @@ def render_informe(match_id: int, meta: dict):
 
     c1, c2, c3 = st.columns([1.2, 1, 1])
     with c1:
-        generate = st.button("Generar informe con Gemini", type="primary", use_container_width=True)
+        generate = st.button("Generar informe con Ollama", type="primary", use_container_width=True)
     with c2:
         reset = st.button("Usar informe local", use_container_width=True)
     with c3:
-        st.caption(f"Modelo: {_gemini_model()}")
+        st.caption(f"Modelo: {_ollama_model()}")
 
     if reset:
         st.session_state.pop(report_key, None)
@@ -8687,10 +8740,10 @@ def render_informe(match_id: int, meta: dict):
         st.session_state.pop(payload_key, None)
 
     if generate:
-        if not _gemini_api_key():
-            st.warning("No hay clave de Gemini configurada. Se muestra el informe local.")
-        with st.spinner("Gemini esta redactando el informe tactico..."):
-            report_text, payload, source = _generate_tactical_report(match_id, meta, use_gemini=True)
+        if not _ollama_api_key():
+            st.warning("No hay clave de Ollama configurada. Se muestra el informe local.")
+        with st.spinner("Ollama esta redactando el informe tactico..."):
+            report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=True)
             st.session_state[report_key] = report_text
             st.session_state[source_key] = source
             st.session_state[payload_key] = payload
@@ -8698,14 +8751,14 @@ def render_informe(match_id: int, meta: dict):
     if report_key in st.session_state:
         report_text = st.session_state[report_key]
         payload = st.session_state.get(payload_key) or _report_payload(match_id, meta)
-        source = st.session_state.get(source_key, "gemini")
+        source = st.session_state.get(source_key, "ollama")
     else:
-        report_text, payload, source = _generate_tactical_report(match_id, meta, use_gemini=False)
+        report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=False)
 
-    if source == "gemini":
-        st.success("Informe generado con Gemini a partir del JSON tactico del partido.")
+    if source == "ollama":
+        st.success("Informe generado con Ollama a partir del JSON tactico del partido.")
     else:
-        st.info("Informe local disponible. Pulsa el boton de Gemini para generar una redaccion tactica mas completa.")
+        st.info("Informe local disponible. Pulsa el boton de Ollama para generar una redaccion tactica mas completa.")
 
     pdf_bytes = _markdown_to_pdf_bytes(report_text, title=f"Informe tactico partido {match_id}")
     d1, d2 = st.columns(2)
@@ -8938,36 +8991,36 @@ def render_informe(match_id: int, meta: dict):
     _page_heading("Informe del partido")
     st.caption("Vista mas visual para cuerpo tecnico: cabecera, escudos, fecha, KPIs, graficos, tablas limpias y texto conciso.")
 
-    report_key = f"gemini_report_{match_id}"
-    source_key = f"gemini_report_source_{match_id}"
-    payload_key = f"gemini_report_payload_{match_id}"
+    report_key = f"ollama_report_{match_id}"
+    source_key = f"ollama_report_source_{match_id}"
+    payload_key = f"ollama_report_payload_{match_id}"
 
     c1, c2 = st.columns([1, 1])
     with c1:
-        generate = st.button("Generar informe con Gemini", type="primary", use_container_width=True)
+        generate = st.button("Generar informe con Ollama", type="primary", use_container_width=True)
     with c2:
         local = st.button("Actualizar informe local", use_container_width=True)
 
     if generate or local:
-        if not _gemini_api_key():
-            st.warning("No hay clave de Gemini configurada. Se generara una version local.")
+        if not _ollama_api_key():
+            st.warning("No hay clave de Ollama configurada. Se generara una version local.")
         with st.spinner("Generando informe tactico..."):
-            report_text, payload, source = _generate_tactical_report(match_id, meta, use_gemini=generate)
+            report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=generate)
             st.session_state[report_key] = report_text
             st.session_state[source_key] = source
             st.session_state[payload_key] = payload
 
     if report_key not in st.session_state:
-        report_text, payload, source = _generate_tactical_report(match_id, meta, use_gemini=False)
+        report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=False)
         st.session_state[report_key] = report_text
         st.session_state[source_key] = source
         st.session_state[payload_key] = payload
 
     report_text = st.session_state[report_key]
     payload = st.session_state.get(payload_key) or _report_payload(match_id, meta)
-    source = st.session_state.get(source_key, "gemini")
-    if source == "gemini":
-        st.success("Informe generado con Gemini. La vista visual usa los datos y graficos del partido.")
+    source = st.session_state.get(source_key, "ollama")
+    if source == "ollama":
+        st.success("Informe generado con Ollama. La vista visual usa los datos y graficos del partido.")
     else:
         st.info("Informe local generado con reglas deterministas del proyecto.")
 
@@ -9222,7 +9275,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Analisis temporal", "CuÃ¡ndo aparecen las secuencias, la peligrosidad y los tiros")
+        fig, ax = _pdf_page("Analisis temporal", "Cuándo aparecen las secuencias, la peligrosidad y los tiros")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("evolucion_temporal_tiros", "evolucion_temporal_tiros.png")), (0.06, 0.37, 0.88, 0.41))
         temporal = pd.DataFrame(payload.get("analisis_temporal", []))
         _pdf_table(
@@ -9497,7 +9550,7 @@ def _coach_report_fallback(payload: dict) -> dict[str, str]:
 
 def _coach_report_sections(payload: dict) -> dict[str, str]:
     fallback = _coach_report_fallback(payload)
-    api_key = _gemini_api_key()
+    api_key = _ollama_api_key()
     if not api_key:
         return fallback
     prompt = (
@@ -9510,7 +9563,7 @@ def _coach_report_sections(payload: dict) -> dict[str, str]:
         f"JSON:\n{json.dumps(payload, ensure_ascii=False)}"
     )
     try:
-        url = GEMINI_API_URL_TEMPLATE.format(model=_gemini_model())
+        url = OLLAMA_API_URL_TEMPLATE.format(model=_ollama_model())
         body = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"temperature": 0.2, "topP": 0.85, "maxOutputTokens": 4096},
@@ -9535,7 +9588,7 @@ def _coach_report_sections(payload: dict) -> dict[str, str]:
 
 
 def _coach_report_source_label() -> str:
-    return "Gemini" if _gemini_api_key() else "motor local"
+    return "Ollama" if _ollama_api_key() else "motor local"
 
 
 def _coach_card_html(title: str, value: object, detail: object = "") -> str:
@@ -9977,7 +10030,7 @@ def render_informe(match_id: int, meta: dict):
 
     c1, c2 = st.columns([1, 1])
     with c1:
-        if st.button("Generar lectura con Gemini", type="primary", use_container_width=True):
+        if st.button("Generar lectura con Ollama", type="primary", use_container_width=True):
             with st.spinner("Generando lectura tactica..."):
                 st.session_state[report_key] = _coach_report_sections(payload)
                 st.session_state.pop(pdf_key, None)
@@ -9990,8 +10043,8 @@ def render_informe(match_id: int, meta: dict):
                     st.error(f"No se pudo generar el informe: {exc}")
                     st.session_state.pop(pdf_key, None)
 
-    if not _gemini_api_key():
-        st.info("Gemini se usara automaticamente cuando exista GEMINI_API_KEY en los secretos. Mientras tanto se genera una version local determinista.")
+    if not _ollama_api_key():
+        st.info("Ollama se usara automaticamente cuando exista OLLAMA_API_KEY en los secretos. Mientras tanto se genera una version local determinista.")
 
     _render_coach_report_preview(match_id, meta, payload, st.session_state[report_key])
 
@@ -10006,57 +10059,64 @@ def render_informe(match_id: int, meta: dict):
         )
 
 
+def _ollama_base_url() -> str:
+    secret_value = None
+    try:
+        secret_value = st.secrets.get("OLLAMA_BASE_URL")
+    except Exception:
+        secret_value = None
+    return str(os.getenv("OLLAMA_BASE_URL") or secret_value or OLLAMA_BASE_URL_DEFAULT).rstrip("/")
+
+
+def _ollama_model() -> str:
+    secret_value = None
+    try:
+        secret_value = st.secrets.get("OLLAMA_MODEL")
+    except Exception:
+        secret_value = None
+    return str(os.getenv("OLLAMA_MODEL") or secret_value or OLLAMA_MODEL_DEFAULT)
+
+
+def _extract_report_json(raw_text: str) -> dict:
+    text = str(raw_text or "").strip()
+    text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"```$", "", text).strip()
+    candidates = [text]
+    start = text.find("{")
+    end = text.rfind("}")
+    if start >= 0 and end > start:
+        candidates.insert(0, text[start : end + 1])
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    raise ValueError("Respuesta sin JSON valido")
+
+
+def _call_ollama_report(prompt_text: str) -> str:
+    body = {
+        "model": _ollama_model(),
+        "prompt": prompt_text,
+        "stream": False,
+        "format": "json",
+        "options": {
+            "temperature": 0.18,
+            "top_p": 0.85,
+            "num_predict": 1800,
+        },
+    }
+    response = requests.post(f"{_ollama_base_url()}/api/generate", json=body, timeout=(5, 120))
+    response.raise_for_status()
+    data = response.json()
+    return str(data.get("response", "")).strip()
+
+
 def _coach_report_sections(payload: dict) -> dict[str, str]:
-    """Strict Gemini report generator: no local fallback for the final report."""
-    api_key = _gemini_api_key()
-    if not api_key:
-        raise RuntimeError("Falta configurar GEMINI_API_KEY en los secretos de la aplicacion.")
-
-    required = [
-        "resumen_ejecutivo",
-        "tipologia_destacada",
-        "estructura_defensiva",
-        "secuencias_criticas",
-        "momentum_critico",
-        "recomendaciones_globales",
-    ]
-    def _extract_report_json(raw_text: str) -> dict:
-        text = str(raw_text or "").strip()
-        text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
-        text = re.sub(r"```$", "", text).strip()
-        candidates = [text]
-        start = text.find("{")
-        end = text.rfind("}")
-        if start >= 0 and end > start:
-            candidates.insert(0, text[start : end + 1])
-        for candidate in candidates:
-            try:
-                parsed = json.loads(candidate)
-            except json.JSONDecodeError:
-                continue
-            if isinstance(parsed, dict):
-                return parsed
-        raise ValueError("Respuesta sin JSON valido")
-
-    def _call_gemini(prompt_text: str) -> str:
-        url = GEMINI_API_URL_TEMPLATE.format(model=_gemini_model())
-        body = {
-            "contents": [{"parts": [{"text": prompt_text}]}],
-            "generationConfig": {"temperature": 0.18, "topP": 0.85, "maxOutputTokens": 4096},
-        }
-        response = requests.post(
-            url,
-            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
-            json=body,
-            timeout=90,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return "\n".join(
-            part.get("text", "")
-            for part in data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
-        ).strip()
-
+    fallback = _coach_report_fallback(payload)
+    required = list(fallback.keys())
     prompt = (
         "Eres analista tactico profesional para un cuerpo tecnico de futbol. "
         "Redacta un informe final breve, profesional y accionable usando solo el JSON. "
@@ -10065,32 +10125,19 @@ def _coach_report_sections(payload: dict) -> dict[str, str]:
         + ", ".join(required)
         + ". Cada clave debe tener entre 3 y 5 frases utiles para un entrenador. "
         "Prioriza solo lo mas importante: tipologia destacada, secuencias criticas, momentum critico, "
-        "estructura defensiva y recomendaciones. No uses tablas.\n\n"
+        "estructura defensiva y recomendaciones. No uses tablas ni introducciones generales.\n\n"
         f"JSON:\n{json.dumps(payload, ensure_ascii=False)}"
     )
-    text = _call_gemini(prompt)
     try:
-        parsed = _extract_report_json(text)
-    except ValueError:
-        repair_prompt = (
-            "Convierte el siguiente texto generado por Gemini en un objeto JSON puro, sin markdown ni explicaciones. "
-            "Usa exactamente estas claves: "
-            + ", ".join(required)
-            + ". Manten el contenido tactico y no inventes datos nuevos.\n\n"
-            f"TEXTO:\n{text}"
-        )
-        try:
-            parsed = _extract_report_json(_call_gemini(repair_prompt))
-        except ValueError as exc:
-            raise RuntimeError("Gemini no devolvio un JSON valido para el informe.") from exc
-    missing = [key for key in required if not str(parsed.get(key, "")).strip()]
-    if missing:
-        raise RuntimeError(f"Gemini no devolvio estas secciones del informe: {', '.join(missing)}.")
-    return {key: str(parsed[key]).strip() for key in required}
+        parsed = _extract_report_json(_call_ollama_report(prompt))
+        sections = {key: str(parsed.get(key) or fallback[key]).strip() for key in required}
+    except Exception:
+        sections = fallback
+    return {key: str(_clean_app_text(value) or fallback[key]) for key, value in sections.items()}
 
 
 def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
-    """Build the coach PDF with Gemini text and only figures already exposed in the web app."""
+    """Build the coach PDF with Ollama text and only figures already exposed in the web app."""
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
         raise RuntimeError(payload["error"])
@@ -10243,25 +10290,25 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
-        "Informe final con Gemini",
+        "Informe final con Ollama",
         "Genera un PDF profesional para entrenador con las conclusiones principales del analisis y solo con graficos ya presentes en la pagina web.",
     )
-    pdf_key = f"gemini_only_report_pdf_{match_id}"
+    pdf_key = f"ollama_only_report_pdf_{match_id}"
 
     if st.button("Generar informe", type="primary", use_container_width=True):
         st.session_state.pop(pdf_key, None)
-        with st.spinner("Gemini esta redactando y montando el informe..."):
+        with st.spinner("Ollama esta redactando y montando el informe..."):
             try:
                 st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
             except Exception as exc:
-                st.error(f"No se pudo generar el informe con Gemini: {exc}")
+                st.error(f"No se pudo generar el informe con Ollama: {exc}")
 
     if pdf_key in st.session_state:
         st.success("Informe generado correctamente.")
         st.download_button(
             "Descargar informe en PDF",
             data=st.session_state[pdf_key],
-            file_name=f"informe_gemini_{match_id}.pdf",
+            file_name=f"informe_ollama_{match_id}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -10455,7 +10502,7 @@ def _elite_fig_path(match_id: int, figures: dict, *keys: str, fallback: str) -> 
 
 
 def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
-    """Build a fixed-layout coach dossier with Gemini text and web-app figures only."""
+    """Build a fixed-layout coach dossier with Ollama text and web-app figures only."""
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
         raise RuntimeError(payload["error"])
@@ -10599,7 +10646,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         _elite_pdf_text_panel(ax, 0.53, 0.49, 0.40, 0.25, "Prioridad 2 - Bloque defensivo", analysis["estructura_defensiva"], max_lines=8)
         _elite_pdf_text_panel(ax, 0.07, 0.215, 0.40, 0.20, "Prioridad 3 - Secuencias criticas", analysis["secuencias_criticas"], max_lines=6)
         _elite_pdf_text_panel(ax, 0.53, 0.215, 0.40, 0.20, "Prioridad 4 - Momentum", analysis["momentum_critico"], max_lines=6)
-        _elite_pdf_text_panel(ax, 0.07, 0.075, 0.86, 0.10, "Plan de trabajo global", analysis["recomendaciones_globales"], max_lines=3)
+        _elite_pdf_text_panel(ax, 0.07, 0.065, 0.86, 0.115, "Plan de trabajo global", analysis["recomendaciones_globales"], max_lines=2)
         pdf.savefig(fig)
         plt.close(fig)
 
@@ -10610,25 +10657,25 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
-        "Informe final con Gemini",
-        "Genera un PDF profesional para entrenador con las conclusiones principales del analisis y solo con graficos ya presentes en la pagina web.",
+        "Informe final con Ollama",
+        "Genera un PDF profesional para entrenador con conclusiones principales, KPIs, graficos ya presentes en la pagina web y recomendaciones tacticas.",
     )
-    pdf_key = f"gemini_only_report_pdf_{match_id}"
+    pdf_key = f"ollama_report_pdf_{match_id}"
 
     if st.button("Generar informe", type="primary", use_container_width=True):
         st.session_state.pop(pdf_key, None)
-        with st.spinner("Gemini esta redactando y montando el informe..."):
+        with st.spinner("Ollama esta redactando y montando el informe..."):
             try:
                 st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
             except Exception as exc:
-                st.error(f"No se pudo generar el informe con Gemini: {exc}")
+                st.error(f"No se pudo generar el informe con Ollama: {exc}")
 
     if pdf_key in st.session_state:
         st.success("Informe generado correctamente.")
         st.download_button(
             "Descargar informe en PDF",
             data=st.session_state[pdf_key],
-            file_name=f"informe_gemini_{match_id}.pdf",
+            file_name=f"informe_ollama_{match_id}.pdf",
             mime="application/pdf",
             type="primary",
             use_container_width=True,
@@ -10677,5 +10724,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-
 
