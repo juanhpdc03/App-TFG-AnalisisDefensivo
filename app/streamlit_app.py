@@ -741,6 +741,30 @@ def inject_style():
             border: 1px solid rgba(200,16,46,0.38) !important;
             font-weight: 800 !important;
         }
+        div[data-testid="stButton"] button[kind="primary"],
+        div[data-testid="stButton"] button[data-testid="baseButton-primary"],
+        div[data-testid="stFormSubmitButton"] button[kind="primary"],
+        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] {
+            background: var(--osasuna-red) !important;
+            border-color: var(--osasuna-red) !important;
+            color: #ffffff !important;
+            box-shadow: 0 12px 22px rgba(200,16,46,0.24) !important;
+        }
+        div[data-testid="stButton"] button[kind="primary"]:hover,
+        div[data-testid="stButton"] button[data-testid="baseButton-primary"]:hover,
+        div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover,
+        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"]:hover {
+            background: var(--osasuna-red) !important;
+            border-color: var(--osasuna-red) !important;
+            color: #ffffff !important;
+        }
+        div[data-testid="stButton"] button[kind="primary"] p,
+        div[data-testid="stButton"] button[data-testid="baseButton-primary"] p,
+        div[data-testid="stFormSubmitButton"] button[kind="primary"] p,
+        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] p {
+            color: #ffffff !important;
+            font-weight: 900 !important;
+        }
         .sidebar-club {
             text-align: center;
             padding: 12px 6px 18px 6px;
@@ -926,7 +950,7 @@ def inject_style():
             grid-template-columns: auto minmax(0, 1fr);
             gap: 14px;
             align-items: center;
-            border-top-color: #2453a6;
+            border-top-color: var(--osasuna-red);
         }
         .registered-team-card-marker {
             display: none;
@@ -934,7 +958,7 @@ def inject_style():
         div[data-testid="stHorizontalBlock"]:has(.registered-team-card-marker) {
             background: rgba(32,37,50,0.78);
             border: 1px solid rgba(255,255,255,0.11);
-            border-top: 4px solid #2453a6;
+            border-top: 4px solid var(--osasuna-red);
             border-radius: 8px;
             padding: 16px;
             box-shadow: 0 12px 28px rgba(0,0,0,0.18);
@@ -950,6 +974,7 @@ def inject_style():
         }
         div[data-testid="stHorizontalBlock"]:has(.registered-team-card-marker) div[data-testid="stButton"] button {
             background: var(--osasuna-red) !important;
+            background-color: var(--osasuna-red) !important;
             color: #ffffff !important;
             border: 1px solid rgba(255,255,255,0.22) !important;
             border-radius: 8px !important;
@@ -1004,7 +1029,7 @@ def inject_style():
         }
         .club-home-card h1 {
             color: #ffffff !important;
-            font-size: 3.15rem;
+            font-size: clamp(3.4rem, 5.2vw, 5.1rem) !important;
             line-height: 1.08;
             margin: 0;
             font-weight: 950;
@@ -1256,7 +1281,7 @@ def inject_style():
         }
         .xt-reference-box {
             display: grid;
-            grid-template-columns: minmax(0, 0.82fr) minmax(260px, 0.44fr);
+            grid-template-columns: minmax(0, 0.78fr) minmax(320px, 0.50fr);
             gap: 14px;
             align-items: center;
             margin: 10px 0 18px 0;
@@ -1309,11 +1334,12 @@ def inject_style():
         }
         .xt-reference-box img {
             width: 100%;
-            max-height: 260px;
+            max-height: 315px;
             object-fit: contain;
             border-radius: 7px;
             border: 1px solid rgba(255,255,255,0.10);
             background: #111827;
+            padding: 0;
         }
         @media (max-width: 900px) {
             .xt-reference-box {
@@ -3477,31 +3503,41 @@ def _plot_selectable_sequence_bar(
         plot_df["_bar_text"] = plot_df[y].map(lambda value: f"{value:.2f}")
     legend_labels = plot_df[color].dropna().astype(str).drop_duplicates().tolist() if color in plot_df.columns else []
     category_colors = color_map or _category_color_map(legend_labels)
-    fig = px.bar(
-        plot_df,
-        x="secuencia",
-        y=y,
-        color=color if color in plot_df.columns else None,
-        text="_bar_text",
-        custom_data=["secuencia_rival_id"],
-        labels=labels or {"secuencia": "Secuencia", y: y},
-        height=height,
-        title=title,
-        color_discrete_sequence=APP_COLOR_SEQUENCE,
-        color_discrete_map=category_colors or APP_COLOR_MAP,
+    if color in plot_df.columns:
+        bar_colors = [
+            category_colors.get(str(value), APP_COLOR_SEQUENCE[idx % len(APP_COLOR_SEQUENCE)])
+            for idx, value in enumerate(plot_df[color].astype(str).tolist())
+        ]
+    else:
+        bar_colors = [APP_COLOR_SEQUENCE[idx % len(APP_COLOR_SEQUENCE)] for idx in range(len(plot_df))]
+    selected_seq = str(int(selected_id)) if selected_id is not None else None
+    marker_line_colors = [
+        "#ffffff" if selected_seq is not None and seq_id == selected_seq else "rgba(255,255,255,0.14)"
+        for seq_id in plot_df["secuencia"].tolist()
+    ]
+    marker_line_widths = [3 if selected_seq is not None and seq_id == selected_seq else 1 for seq_id in plot_df["secuencia"].tolist()]
+    fig = go.Figure(
+        data=[
+            go.Bar(
+                x=plot_df["secuencia"],
+                y=plot_df[y],
+                text=plot_df["_bar_text"],
+                customdata=plot_df[["secuencia_rival_id"]].astype(int).to_numpy(),
+                marker=dict(
+                    color=bar_colors,
+                    opacity=0.96,
+                    line=dict(color=marker_line_colors, width=marker_line_widths),
+                ),
+                hovertemplate="Secuencia %{x}<br>%{y:.3f}<extra></extra>",
+            )
+        ]
     )
     fig.update_traces(
         texttemplate="%{text}",
         textposition="outside",
         cliponaxis=False,
         textfont=dict(size=15, color="#f8fafc", family="Arial Black, Arial, sans-serif"),
-        marker=dict(opacity=0.96),
     )
-    for trace in fig.data:
-        trace_name = str(getattr(trace, "name", ""))
-        if trace_name in category_colors:
-            trace.marker.color = category_colors[trace_name]
-            trace.marker.line = dict(color="rgba(255,255,255,0.14)", width=1)
     _apply_plotly_theme(fig)
     fig.update_layout(
         margin=dict(l=72, r=8, t=64, b=78),
@@ -3509,6 +3545,7 @@ def _plot_selectable_sequence_bar(
         clickmode="event+select",
         showlegend=False,
         title=dict(x=0.5, xanchor="center", font=dict(size=22, color="#f4f6fb")),
+        height=height,
     )
     max_y = pd.to_numeric(plot_df[y], errors="coerce").max()
     y_range_top = max(float(max_y) * 1.28, 0.1) if pd.notna(max_y) else None
@@ -6910,13 +6947,21 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         "Esta pestaña concentra las jugadas que conviene revisar en vídeo primero. Puedes filtrar, ordenar por prioridad, abrir la lectura táctica de cada barra y cargar el vídeo solo cuando lo necesites.",
     )
     _subsection_heading("Jugada crítica: filtrar, ordenar y revisar")
-    st.caption("Filtra solo por IDD, IPO o prioridad combinada. La gráfica muestra el top 5 de acciones para revisar primero.")
-    criterio = st.selectbox(
-        "Ordenar por",
-        ["Combinada", "IPO", "IDD"],
-        key=f"crit_sort_{match_id}",
-    )
-    current = seq.copy()
+    st.caption("Filtra por todas las tipologías o por una concreta, y ordena solo por IDD, IPO o prioridad combinada. La gráfica muestra el top 5 de acciones para revisar primero.")
+    filter_col, sort_col_ui = st.columns([1.15, 1])
+    with filter_col:
+        tipologia_filter = st.selectbox(
+            "Tipología",
+            _tipology_options(seq),
+            key=f"crit_tipologia_{match_id}",
+        )
+    with sort_col_ui:
+        criterio = st.selectbox(
+            "Ordenar por",
+            ["Combinada", "IPO", "IDD"],
+            key=f"crit_sort_{match_id}",
+        )
+    current = _filter_tipology(seq, tipologia_filter)
     if "score_critico" not in current.columns:
         current["score_critico"] = (
             pd.to_numeric(current.get("indice_desorganizacion", pd.Series(0, index=current.index)), errors="coerce").fillna(0)
@@ -6932,7 +6977,7 @@ def render_secuencias_criticas(match_id: int, meta: dict):
     all_patterns = [v for v in _tipology_options(seq) if v != "Todas"]
     pattern_color_map = _tipology_color_map(all_patterns)
     top_for_chart = current.head(5).copy()
-    selected_key = f"crit_seq_selected_{match_id}"
+    selected_key = f"crit_seq_selected_{match_id}_{tipologia_filter}_{criterio}"
     options = top_for_chart["secuencia_rival_id"].dropna().astype(int).tolist()
     selected = st.session_state.get(selected_key)
     try:
@@ -6942,26 +6987,24 @@ def render_secuencias_criticas(match_id: int, meta: dict):
     if selected is not None and selected not in options:
         selected = None
         st.session_state[selected_key] = None
-    if selected is None and options:
-        selected = int(options[0])
+    if top_for_chart.empty:
+        st.info("No hay secuencias para el filtro seleccionado.")
+        return
+    clicked = _plot_selectable_sequence_bar(
+        top_for_chart,
+        sort_col,
+        f"Top 5 secuencias por {criterio}",
+        color="tipologia",
+        selected_id=int(selected) if selected is not None else None,
+        key=f"crit_bar_select_{match_id}_{tipologia_filter}_{criterio}",
+        labels={"secuencia": "Secuencia", sort_col: criterio, "tipologia": "Tipología"},
+        height=500,
+        color_map=pattern_color_map,
+    )
+    if clicked is not None and int(clicked) in options:
+        selected = int(clicked)
         st.session_state[selected_key] = selected
-    if not top_for_chart.empty:
-        clicked = _plot_selectable_sequence_bar(
-            top_for_chart,
-            sort_col,
-            f"Top 5 secuencias por {criterio}",
-            color="tipologia",
-            selected_id=int(selected) if selected is not None else None,
-            key=f"crit_bar_select_{match_id}_{criterio}",
-            labels={"secuencia": "Secuencia", sort_col: criterio, "tipologia": "Tipología"},
-            height=500,
-            color_map=pattern_color_map,
-        )
-        if clicked is not None and int(clicked) in options:
-            selected = int(clicked)
-            st.session_state[selected_key] = selected
     if selected is None:
-        st.info("No hay ninguna secuencia seleccionada. Pincha en una barra para abrir su lectura y decidir si quieres ver el vídeo.")
         return
     row = current[current["secuencia_rival_id"].astype(int).eq(int(selected))].iloc[0]
     row_tipologia = str(row.get("tipologia", "-"))
@@ -7373,13 +7416,15 @@ def _render_momentum_formula_note():
         """
         <div class="momentum-formula-card">
           <strong>Como se calcula el momentum defensivo</strong>
+          <span>Cada secuencia rival se transforma primero en un impulso de presion defensiva. Ese impulso mezcla desorganizacion del bloque, amenaza ofensiva, xThreat y profundidad territorial.</span>
           <div class="momentum-formula-grid">
-            <div><b>IDD</b><em>35%</em></div>
-            <div><b>IPO</b><em>35%</em></div>
-            <div><b>xT</b><em>20%</em></div>
-            <div><b>Ultimo tercio</b><em>10%</em></div>
+            <div><b>IDD</b><em>35%</em><span>Cuanto mas se rompe la estructura, mas sube la curva.</span></div>
+            <div><b>IPO</b><em>35%</em><span>Prioriza acciones con peligro real o potencial alto.</span></div>
+            <div><b>xT</b><em>20%</em><span>Se normaliza con el P90 del partido para evitar picos aislados.</span></div>
+            <div><b>Ultimo tercio</b><em>10%</em><span>Premia las secuencias que alcanzan zonas profundas.</span></div>
           </div>
-          <span>La curva acumula esos impulsos por minuto con memoria del 88%: varias secuencias seguidas sostienen la presion y los minutos tranquilos la reducen.</span>
+          <span>La curva suma los impulsos por minuto y conserva el 88% del valor del minuto anterior. Por eso una accion aislada genera un pico breve, mientras que varias llegadas seguidas sostienen el momentum rival.</span>
+          <span>Las alertas temporales se calculan en tramos de 15 minutos con una mezcla distinta: 26% volumen de secuencias, 24% IDD, 24% IPO, 16% tiros y 10% entradas al ultimo tercio. Asi se detecta el tramo que combina insistencia, desorden, amenaza y finalizacion.</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -7634,6 +7679,12 @@ def render_cronologia(match_id: int, meta: dict):
             font-size: 1.12rem;
             margin-top: 2px;
           }
+          .momentum-formula-grid span {
+            color: #d8e0ef;
+            font-size: .76rem;
+            line-height: 1.25;
+            margin-top: 5px;
+          }
           .chrono-phase-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -7686,6 +7737,7 @@ def render_cronologia(match_id: int, meta: dict):
     critical = selected_windows[0][2] if selected_windows else None
 
     _info_heading("Momentum defensivo", MOMENTUM_INFO, level=3)
+    _render_momentum_formula_note()
     _plot_defensive_momentum(df, critical)
 
     _subsection_heading("Alertas temporales del partido")
