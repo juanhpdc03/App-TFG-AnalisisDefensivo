@@ -741,27 +741,51 @@ def inject_style():
             border: 1px solid rgba(200,16,46,0.38) !important;
             font-weight: 800 !important;
         }
+        button[kind="primary"],
+        button[data-testid="baseButton-primary"],
+        button[data-testid="stBaseButton-primary"],
         div[data-testid="stButton"] button[kind="primary"],
         div[data-testid="stButton"] button[data-testid="baseButton-primary"],
+        div[data-testid="stButton"] button[data-testid="stBaseButton-primary"],
+        div[data-testid="stFormSubmitButton"] button,
         div[data-testid="stFormSubmitButton"] button[kind="primary"],
-        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] {
+        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"],
+        div[data-testid="stFormSubmitButton"] button[data-testid="stBaseButton-primary"] {
             background: var(--osasuna-red) !important;
+            background-color: var(--osasuna-red) !important;
             border-color: var(--osasuna-red) !important;
             color: #ffffff !important;
             box-shadow: 0 12px 22px rgba(200,16,46,0.24) !important;
         }
+        button[kind="primary"]:hover,
+        button[data-testid="baseButton-primary"]:hover,
+        button[data-testid="stBaseButton-primary"]:hover,
+        button[kind="primary"]:focus,
+        button[data-testid="baseButton-primary"]:focus,
+        button[data-testid="stBaseButton-primary"]:focus,
         div[data-testid="stButton"] button[kind="primary"]:hover,
         div[data-testid="stButton"] button[data-testid="baseButton-primary"]:hover,
+        div[data-testid="stButton"] button[data-testid="stBaseButton-primary"]:hover,
+        div[data-testid="stFormSubmitButton"] button:hover,
+        div[data-testid="stFormSubmitButton"] button:focus,
         div[data-testid="stFormSubmitButton"] button[kind="primary"]:hover,
-        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"]:hover {
+        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"]:hover,
+        div[data-testid="stFormSubmitButton"] button[data-testid="stBaseButton-primary"]:hover {
             background: var(--osasuna-red) !important;
+            background-color: var(--osasuna-red) !important;
             border-color: var(--osasuna-red) !important;
             color: #ffffff !important;
         }
+        button[kind="primary"] *,
+        button[data-testid="baseButton-primary"] *,
+        button[data-testid="stBaseButton-primary"] *,
         div[data-testid="stButton"] button[kind="primary"] p,
         div[data-testid="stButton"] button[data-testid="baseButton-primary"] p,
+        div[data-testid="stButton"] button[data-testid="stBaseButton-primary"] p,
+        div[data-testid="stFormSubmitButton"] button *,
         div[data-testid="stFormSubmitButton"] button[kind="primary"] p,
-        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] p {
+        div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] p,
+        div[data-testid="stFormSubmitButton"] button[data-testid="stBaseButton-primary"] p {
             color: #ffffff !important;
             font-weight: 900 !important;
         }
@@ -1029,11 +1053,18 @@ def inject_style():
         }
         .club-home-card h1 {
             color: #ffffff !important;
-            font-size: clamp(3.4rem, 5.2vw, 5.1rem) !important;
+            font-size: clamp(4.2rem, 6.7vw, 6.4rem) !important;
             line-height: 1.08;
             margin: 0;
             font-weight: 950;
             text-transform: none;
+        }
+        .club-name-large {
+            color: #ffffff !important;
+            font-size: clamp(4.2rem, 6.7vw, 6.4rem) !important;
+            line-height: 1.02 !important;
+            font-weight: 950 !important;
+            text-transform: none !important;
         }
         .club-stat-grid {
             grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -3496,11 +3527,7 @@ def _plot_selectable_sequence_bar(
         st.info("No hay datos suficientes para este grafico.")
         return selected_id
     plot_df["secuencia"] = plot_df["secuencia_rival_id"].astype(int).astype(str)
-    numeric_text = plot_df[y].dropna()
-    if not numeric_text.empty and np.allclose(numeric_text, numeric_text.round()):
-        plot_df["_bar_text"] = numeric_text.reindex(plot_df.index).map(lambda value: f"{value:.0f}")
-    else:
-        plot_df["_bar_text"] = plot_df[y].map(lambda value: f"{value:.2f}")
+    plot_df["_xpos"] = np.arange(len(plot_df), dtype=int)
     legend_labels = plot_df[color].dropna().astype(str).drop_duplicates().tolist() if color in plot_df.columns else []
     category_colors = color_map or _category_color_map(legend_labels)
     if color in plot_df.columns:
@@ -3512,50 +3539,70 @@ def _plot_selectable_sequence_bar(
         bar_colors = [APP_COLOR_SEQUENCE[idx % len(APP_COLOR_SEQUENCE)] for idx in range(len(plot_df))]
     selected_seq = str(int(selected_id)) if selected_id is not None else None
     marker_line_colors = [
-        "#ffffff" if selected_seq is not None and seq_id == selected_seq else "rgba(255,255,255,0.14)"
+        "#c8102e" if selected_seq is not None and seq_id == selected_seq else "rgba(255,255,255,0.10)"
         for seq_id in plot_df["secuencia"].tolist()
     ]
-    marker_line_widths = [3 if selected_seq is not None and seq_id == selected_seq else 1 for seq_id in plot_df["secuencia"].tolist()]
+    marker_line_widths = [2.4 if selected_seq is not None and seq_id == selected_seq else 0.8 for seq_id in plot_df["secuencia"].tolist()]
     fig = go.Figure(
         data=[
             go.Bar(
-                x=plot_df["secuencia"],
+                x=plot_df["_xpos"],
                 y=plot_df[y],
-                text=plot_df["_bar_text"],
-                customdata=plot_df[["secuencia_rival_id"]].astype(int).to_numpy(),
+                width=0.58,
+                customdata=np.stack(
+                    [
+                        plot_df["secuencia_rival_id"].astype(int),
+                        plot_df["secuencia"].astype(str),
+                        plot_df[y].astype(float).round(3),
+                    ],
+                    axis=-1,
+                ),
                 marker=dict(
                     color=bar_colors,
-                    opacity=0.96,
+                    opacity=0.95,
                     line=dict(color=marker_line_colors, width=marker_line_widths),
                 ),
-                hovertemplate="Secuencia %{x}<br>%{y:.3f}<extra></extra>",
+                hovertemplate="Secuencia %{customdata[1]}<br>%{y:.3f}<extra></extra>",
             )
         ]
     )
-    fig.update_traces(
-        texttemplate="%{text}",
-        textposition="outside",
-        cliponaxis=False,
-        textfont=dict(size=15, color="#f8fafc", family="Arial Black, Arial, sans-serif"),
-    )
     _apply_plotly_theme(fig)
     fig.update_layout(
-        margin=dict(l=72, r=8, t=64, b=78),
-        bargap=0.22,
+        margin=dict(l=78, r=22, t=64, b=76),
+        bargap=0.36,
         clickmode="event+select",
         showlegend=False,
         title=dict(x=0.5, xanchor="center", font=dict(size=22, color="#f4f6fb")),
         height=height,
+        dragmode=False,
+        paper_bgcolor="#30384a",
+        plot_bgcolor="#30384a",
+        shapes=[
+            dict(
+                type="rect",
+                xref="paper",
+                yref="paper",
+                x0=0,
+                y0=0,
+                x1=1,
+                y1=1,
+                line=dict(color="#c8102e", width=1.4),
+                fillcolor="rgba(0,0,0,0)",
+                layer="above",
+            )
+        ],
     )
     max_y = pd.to_numeric(plot_df[y], errors="coerce").max()
-    y_range_top = max(float(max_y) * 1.28, 0.1) if pd.notna(max_y) else None
+    y_range_top = max(float(max_y) * 1.16, 0.1) if pd.notna(max_y) else None
     fig.update_xaxes(
         showgrid=False,
-        type="category",
-        categoryorder="array",
-        categoryarray=plot_df["secuencia"].tolist(),
+        tickmode="array",
+        tickvals=plot_df["_xpos"].tolist(),
+        ticktext=plot_df["secuencia"].tolist(),
         title=dict(text="Secuencia", standoff=16, font=dict(size=16, color="#f4f6fb")),
         tickfont=dict(size=14, color="#dbe3f3"),
+        zeroline=False,
+        fixedrange=True,
     )
     fig.update_yaxes(
         showgrid=True,
@@ -3563,50 +3610,41 @@ def _plot_selectable_sequence_bar(
         tickformat=".2f",
         tickfont=dict(size=14, color="#dbe3f3"),
         range=[0, y_range_top] if y_range_top else None,
+        zeroline=False,
+        fixedrange=True,
     )
     points = []
-    if plotly_events is not None:
-        points = plotly_events(
-            fig,
-            click_event=True,
-            select_event=False,
-            hover_event=False,
-            override_height=height,
-            override_width="100%",
-            key=key,
-        )
-        _clean_plotly_events_frame()
-    else:
-        event = st.plotly_chart(
-            fig,
-            use_container_width=True,
-            config=PLOTLY_CONFIG,
-            key=key,
-            on_select="rerun",
-            selection_mode="points",
-        )
-        event_sources = [event, st.session_state.get(key)]
-        for source in event_sources:
-            if not source:
-                continue
-            try:
-                points = source.selection.points
-            except AttributeError:
-                if isinstance(source, dict):
-                    points = source.get("selection", {}).get("points", [])
-            if points:
-                break
+    event = st.plotly_chart(
+        fig,
+        use_container_width=True,
+        config=PLOTLY_CONFIG,
+        key=key,
+        on_select="rerun",
+        selection_mode="points",
+    )
+    event_sources = [event, st.session_state.get(key)]
+    for source in event_sources:
+        if not source:
+            continue
+        try:
+            points = source.selection.points
+        except AttributeError:
+            if isinstance(source, dict):
+                points = source.get("selection", {}).get("points", [])
+        if points:
+            break
     if points:
         point = points[0]
         customdata = point.get("customdata") or point.get("custom_data")
         try:
             selected_id = int(customdata[0] if isinstance(customdata, (list, tuple)) else customdata)
         except (TypeError, ValueError, IndexError):
-            for field in ("x", "label", "point_number", "pointIndex", "point_index"):
+            for field in ("point_number", "pointIndex", "point_index"):
                 try:
-                    selected_id = int(point.get(field))
+                    idx = int(point.get(field))
+                    selected_id = int(plot_df.iloc[idx]["secuencia_rival_id"])
                     break
-                except (TypeError, ValueError):
+                except (TypeError, ValueError, IndexError):
                     pass
     return selected_id
 
@@ -6586,7 +6624,7 @@ def render_club_home(team: dict):
         <div class="club-home-card">
             <div>{logo}</div>
             <div>
-                <h1>{html.escape(str(team.get("name", "Equipo")))}</h1>
+                <div class="club-name-large" style="font-size:clamp(4.2rem, 6.7vw, 6.4rem) !important;">{html.escape(str(team.get("name", "Equipo")))}</div>
             </div>
         </div>
         """,
@@ -7737,7 +7775,6 @@ def render_cronologia(match_id: int, meta: dict):
     critical = selected_windows[0][2] if selected_windows else None
 
     _info_heading("Momentum defensivo", MOMENTUM_INFO, level=3)
-    _render_momentum_formula_note()
     _plot_defensive_momentum(df, critical)
 
     _subsection_heading("Alertas temporales del partido")
