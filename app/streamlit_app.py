@@ -1364,13 +1364,15 @@ def inject_style():
             font-weight: 750;
         }
         .xt-reference-box img {
-            width: 100%;
+            display: block;
+            width: min(96%, 540px);
             max-height: 315px;
             object-fit: contain;
+            margin: 0 auto;
             border-radius: 7px;
             border: 1px solid rgba(255,255,255,0.10);
             background: #111827;
-            padding: 0;
+            padding: 6px;
         }
         @media (max-width: 900px) {
             .xt-reference-box {
@@ -3604,7 +3606,38 @@ def _plot_selectable_sequence_bar(
         fixedrange=True,
     )
     frame_anchor = "critical-sequence-chart-" + re.sub(r"[^a-zA-Z0-9_-]+", "-", str(key))
-    st.markdown(f'<span id="{frame_anchor}" class="critical-sequence-chart-anchor"></span>', unsafe_allow_html=True)
+    st.markdown(
+        f"""
+        <style>
+        div[data-testid="stElementContainer"]:has(#{frame_anchor}) {{
+            height: 0 !important;
+            min-height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            overflow: hidden !important;
+        }}
+        div[data-testid="stElementContainer"]:has(#{frame_anchor}) + div[data-testid="stElementContainer"] {{
+            border: 1.5px solid #c8102e !important;
+            border-radius: 0 !important;
+            padding: 14px !important;
+            background: #30384a !important;
+            box-sizing: border-box !important;
+            margin-top: 12px !important;
+            margin-bottom: 18px !important;
+            box-shadow: none !important;
+        }}
+        div[data-testid="stElementContainer"]:has(#{frame_anchor}) + div[data-testid="stElementContainer"] [data-testid="stPlotlyChart"] {{
+            border: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            background: #30384a !important;
+            box-shadow: none !important;
+        }}
+        </style>
+        <span id="{frame_anchor}" class="critical-sequence-chart-anchor"></span>
+        """,
+        unsafe_allow_html=True,
+    )
     points = []
     event = st.plotly_chart(
         fig,
@@ -3613,47 +3646,6 @@ def _plot_selectable_sequence_bar(
         key=key,
         on_select="rerun",
         selection_mode="points",
-    )
-    components.html(
-        f"""
-        <script>
-        (() => {{
-          const doc = window.parent.document;
-          const anchorId = {json.dumps(frame_anchor)};
-          function applyCriticalChartFrame() {{
-            const anchor = doc.getElementById(anchorId);
-            if (!anchor) return;
-            const anchorTop = anchor.getBoundingClientRect().top;
-            const charts = Array.from(doc.querySelectorAll('[data-testid="stPlotlyChart"]'));
-            const chart = charts.find((el) => {{
-              const rect = el.getBoundingClientRect();
-              return rect.top >= anchorTop - 8;
-            }});
-            if (!chart) return;
-            const container = chart.closest('[data-testid="stElementContainer"]') || chart.parentElement;
-            const target = container || chart;
-            chart.style.setProperty("border", "0", "important");
-            chart.style.setProperty("padding", "0", "important");
-            chart.style.setProperty("margin", "0", "important");
-            chart.style.setProperty("background", "#30384a", "important");
-            chart.style.setProperty("box-sizing", "border-box", "important");
-            chart.style.setProperty("box-shadow", "none", "important");
-            target.style.setProperty("border", "1.5px solid #c8102e", "important");
-            target.style.setProperty("border-radius", "0", "important");
-            target.style.setProperty("padding", "14px", "important");
-            target.style.setProperty("background", "#30384a", "important");
-            target.style.setProperty("box-sizing", "border-box", "important");
-            target.style.setProperty("margin-top", "12px", "important");
-            target.style.setProperty("margin-bottom", "18px", "important");
-            target.style.setProperty("box-shadow", "none", "important");
-          }}
-          applyCriticalChartFrame();
-          [100, 350, 800, 1400, 2400].forEach((delay) => setTimeout(applyCriticalChartFrame, delay));
-        }})();
-        </script>
-        """,
-        height=0,
-        width=0,
     )
     event_sources = [event, st.session_state.get(key)]
     for source in event_sources:
