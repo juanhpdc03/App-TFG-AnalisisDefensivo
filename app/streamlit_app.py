@@ -3630,13 +3630,22 @@ def _plot_selectable_sequence_bar(
               return rect.top >= anchorTop - 8;
             }});
             if (!chart) return;
-            chart.style.setProperty("border", "1.5px solid #c8102e", "important");
-            chart.style.setProperty("border-radius", "0", "important");
-            chart.style.setProperty("padding", "10px", "important");
+            const container = chart.closest('[data-testid="stElementContainer"]') || chart.parentElement;
+            const target = container || chart;
+            chart.style.setProperty("border", "0", "important");
+            chart.style.setProperty("padding", "0", "important");
+            chart.style.setProperty("margin", "0", "important");
             chart.style.setProperty("background", "#30384a", "important");
             chart.style.setProperty("box-sizing", "border-box", "important");
-            chart.style.setProperty("margin-top", "10px", "important");
             chart.style.setProperty("box-shadow", "none", "important");
+            target.style.setProperty("border", "1.5px solid #c8102e", "important");
+            target.style.setProperty("border-radius", "0", "important");
+            target.style.setProperty("padding", "14px", "important");
+            target.style.setProperty("background", "#30384a", "important");
+            target.style.setProperty("box-sizing", "border-box", "important");
+            target.style.setProperty("margin-top", "12px", "important");
+            target.style.setProperty("margin-bottom", "18px", "important");
+            target.style.setProperty("box-shadow", "none", "important");
           }}
           applyCriticalChartFrame();
           [100, 350, 800, 1400, 2400].forEach((delay) => setTimeout(applyCriticalChartFrame, delay));
