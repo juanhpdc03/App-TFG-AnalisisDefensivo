@@ -744,6 +744,7 @@ def inject_style():
         button[kind="primary"],
         button[data-testid="baseButton-primary"],
         button[data-testid="stBaseButton-primary"],
+        div[data-testid="stDownloadButton"] button,
         div[data-testid="stButton"] button[kind="primary"],
         div[data-testid="stButton"] button[data-testid="baseButton-primary"],
         div[data-testid="stButton"] button[data-testid="stBaseButton-primary"],
@@ -760,6 +761,8 @@ def inject_style():
         button[kind="primary"]:hover,
         button[data-testid="baseButton-primary"]:hover,
         button[data-testid="stBaseButton-primary"]:hover,
+        div[data-testid="stDownloadButton"] button:hover,
+        div[data-testid="stDownloadButton"] button:focus,
         button[kind="primary"]:focus,
         button[data-testid="baseButton-primary"]:focus,
         button[data-testid="stBaseButton-primary"]:focus,
@@ -779,6 +782,8 @@ def inject_style():
         button[kind="primary"] *,
         button[data-testid="baseButton-primary"] *,
         button[data-testid="stBaseButton-primary"] *,
+        div[data-testid="stDownloadButton"] button *,
+        div[data-testid="stDownloadButton"] button p,
         div[data-testid="stButton"] button[kind="primary"] p,
         div[data-testid="stButton"] button[data-testid="baseButton-primary"] p,
         div[data-testid="stButton"] button[data-testid="stBaseButton-primary"] p,
@@ -786,6 +791,34 @@ def inject_style():
         div[data-testid="stFormSubmitButton"] button[kind="primary"] p,
         div[data-testid="stFormSubmitButton"] button[data-testid="baseButton-primary"] p,
         div[data-testid="stFormSubmitButton"] button[data-testid="stBaseButton-primary"] p {
+            color: #ffffff !important;
+            font-weight: 900 !important;
+        }
+        div[data-testid="stDownloadButton"] {
+            width: 100% !important;
+        }
+        div[data-testid="stDownloadButton"] button,
+        div[data-testid="stDownloadButton"] button[kind="secondary"],
+        div[data-testid="stDownloadButton"] button[data-testid*="baseButton"] {
+            width: 100% !important;
+            min-height: 46px !important;
+            background: var(--osasuna-red) !important;
+            background-color: var(--osasuna-red) !important;
+            border: 1px solid var(--osasuna-red) !important;
+            border-radius: 8px !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            box-shadow: 0 12px 22px rgba(200,16,46,0.24) !important;
+        }
+        div[data-testid="stDownloadButton"] button:hover,
+        div[data-testid="stDownloadButton"] button:focus {
+            background: var(--osasuna-red-dark) !important;
+            background-color: var(--osasuna-red-dark) !important;
+            border-color: var(--osasuna-red-dark) !important;
+            color: #ffffff !important;
+        }
+        div[data-testid="stDownloadButton"] button *,
+        div[data-testid="stDownloadButton"] button p {
             color: #ffffff !important;
             font-weight: 900 !important;
         }
@@ -10138,6 +10171,374 @@ def render_informe(match_id: int, meta: dict):
             data=st.session_state[pdf_key],
             file_name=f"informe_gemini_{match_id}.pdf",
             mime="application/pdf",
+            use_container_width=True,
+        )
+
+
+PDF_RED = "#c8102e"
+PDF_NAVY = "#15223b"
+PDF_INK = "#111827"
+PDF_MUTED = "#667085"
+PDF_PAGE_BG = "#f8f1f2"
+PDF_PANEL = "#ffffff"
+
+
+def _elite_pdf_clean(value, default: str = "-") -> str:
+    if value is None:
+        return default
+    try:
+        if pd.isna(value):
+            return default
+    except (TypeError, ValueError):
+        pass
+    text = re.sub(r"\s+", " ", str(value)).strip()
+    if "\u00c3" in text or "\u00c2" in text:
+        try:
+            text = text.encode("latin1").decode("utf-8")
+        except UnicodeError:
+            pass
+    return text or default
+
+
+def _elite_pdf_short(value, max_len: int = 38) -> str:
+    text = _elite_pdf_clean(value)
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 1].rstrip(" -.,") + "."
+
+
+def _elite_pdf_page(title: str, subtitle: str = "", page: int | None = None, total: int | None = None):
+    fig = plt.figure(figsize=(11.69, 8.27), facecolor="#ffffff", constrained_layout=False)
+    ax = fig.add_axes([0, 0, 1, 1])
+    ax.set_axis_off()
+    ax.set_xlim(0, 1)
+    ax.set_ylim(0, 1)
+    ax.add_patch(plt.Rectangle((0.04, 0.04), 0.92, 0.92, transform=ax.transAxes, facecolor=PDF_PAGE_BG, edgecolor="#e5e7eb", linewidth=0.8))
+    ax.add_patch(plt.Rectangle((0.04, 0.86), 0.92, 0.10, transform=ax.transAxes, facecolor=PDF_RED, edgecolor="none"))
+    ax.add_patch(plt.Rectangle((0.04, 0.82), 0.92, 0.04, transform=ax.transAxes, facecolor=PDF_NAVY, edgecolor="none"))
+    ax.text(0.07, 0.925, title, transform=ax.transAxes, fontsize=21, weight="bold", color="white", va="top")
+    if subtitle:
+        ax.text(0.07, 0.875, subtitle, transform=ax.transAxes, fontsize=10.5, color="#fbe8eb", va="top")
+    if page is not None and total is not None:
+        ax.text(0.92, 0.055, f"{page}/{total}", transform=ax.transAxes, fontsize=8.5, color=PDF_MUTED, ha="right", va="bottom")
+    return fig, ax
+
+
+def _elite_pdf_text(
+    ax,
+    x: float,
+    y: float,
+    text,
+    size: float = 9.5,
+    weight: str = "normal",
+    color: str = PDF_INK,
+    width: int = 95,
+    line_height: float | None = None,
+    max_lines: int | None = None,
+) -> float:
+    clean = _elite_pdf_clean(text, "")
+    lines: list[str] = []
+    for raw in clean.splitlines() or [""]:
+        lines.extend(textwrap.wrap(raw, width=width) or [""])
+    if max_lines is not None and len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = lines[-1].rstrip(" .,:;") + "..."
+    line_height = line_height if line_height is not None else max(0.017, size / 370)
+    for line in lines:
+        ax.text(x, y, line, transform=ax.transAxes, fontsize=size, weight=weight, color=color, va="top")
+        y -= line_height
+    return y
+
+
+def _elite_pdf_panel(ax, x: float, y: float, w: float, h: float, face: str = PDF_PANEL, edge: str = "#e1e5ec", lw: float = 0.8):
+    ax.add_patch(plt.Rectangle((x, y), w, h, transform=ax.transAxes, facecolor=face, edgecolor=edge, linewidth=lw))
+
+
+def _elite_pdf_text_panel(ax, x: float, y: float, w: float, h: float, title: str, body: str, max_lines: int = 7):
+    _elite_pdf_panel(ax, x, y, w, h)
+    ax.add_patch(plt.Rectangle((x, y + h - 0.012), w, 0.012, transform=ax.transAxes, facecolor=PDF_RED, edgecolor="none"))
+    ax.text(x + 0.018, y + h - 0.035, title, transform=ax.transAxes, fontsize=12.5, weight="bold", color=PDF_RED, va="top")
+    _elite_pdf_text(ax, x + 0.018, y + h - 0.075, body, size=9.2, width=max(45, int(w * 122)), line_height=0.022, max_lines=max_lines)
+
+
+def _elite_pdf_add_image(fig, ax, path: Path | None, box: tuple[float, float, float, float], title: str | None = None, pad: float = 0.012):
+    x, y, w, h = box
+    _elite_pdf_panel(ax, x, y, w, h)
+    title_h = 0.036 if title else 0.0
+    if title:
+        ax.text(x + 0.014, y + h - 0.016, title, transform=ax.transAxes, fontsize=10.5, weight="bold", color=PDF_NAVY, va="top")
+    if path is None or not Path(path).exists():
+        ax.text(x + w / 2, y + h / 2, "Grafico no disponible", transform=ax.transAxes, fontsize=9, color=PDF_MUTED, ha="center", va="center")
+        return
+    try:
+        img = plt.imread(path)
+    except Exception:
+        ax.text(x + w / 2, y + h / 2, "No se pudo cargar el grafico", transform=ax.transAxes, fontsize=9, color=PDF_MUTED, ha="center", va="center")
+        return
+    inner = [x + pad, y + pad, max(0.01, w - pad * 2), max(0.01, h - pad * 2 - title_h)]
+    if title:
+        inner[1] = y + pad
+    ax_img = fig.add_axes(inner)
+    ax_img.set_axis_off()
+    ax_img.imshow(img)
+    ax_img.set_aspect("equal")
+
+
+def _elite_pdf_logo(fig, path: Path | None, box: tuple[float, float, float, float]):
+    if path is None or not Path(path).exists():
+        return
+    try:
+        img = plt.imread(path)
+    except Exception:
+        return
+    ax_img = fig.add_axes(box)
+    ax_img.set_axis_off()
+    ax_img.imshow(img)
+    ax_img.set_aspect("equal")
+
+
+def _elite_metric_card(ax, x: float, y: float, w: float, h: float, label: str, value, accent: str = PDF_RED):
+    _elite_pdf_panel(ax, x, y, w, h, face="#ffffff", edge="#d9dee8")
+    ax.add_patch(plt.Rectangle((x, y + h - 0.012), w, 0.012, transform=ax.transAxes, facecolor=accent, edgecolor="none"))
+    ax.text(x + 0.014, y + h - 0.029, str(label).upper(), transform=ax.transAxes, fontsize=7.9, weight="bold", color=PDF_MUTED, va="top")
+    shown = _elite_pdf_short(value, 44)
+    wrap_width = max(9, int(w * 70))
+    lines = textwrap.wrap(shown, width=wrap_width) or [shown]
+    lines = lines[:2]
+    font_size = 15 if len(lines) == 1 and len(shown) <= 12 else 11 if len(lines) == 1 else 9.4
+    line_y = y + h - 0.053
+    for line in lines:
+        ax.text(x + 0.014, line_y, line, transform=ax.transAxes, fontsize=font_size, weight="bold", color=PDF_INK, va="top")
+        line_y -= 0.027
+
+
+def _elite_pdf_table(ax, df: pd.DataFrame, columns: list[str], labels: list[str], bbox, font_size: float = 7.4, max_rows: int = 5):
+    if df is None or df.empty:
+        _elite_pdf_panel(ax, bbox[0], bbox[1], bbox[2], bbox[3])
+        ax.text(bbox[0] + bbox[2] / 2, bbox[1] + bbox[3] / 2, "Sin datos disponibles", transform=ax.transAxes, fontsize=9, color=PDF_MUTED, ha="center", va="center")
+        return
+    cols = [col for col in columns if col in df.columns]
+    if not cols:
+        return
+    _elite_pdf_panel(ax, bbox[0], bbox[1], bbox[2], bbox[3], face="#ffffff", edge="#d7dce5")
+    table = df[cols].head(max_rows).copy()
+    for col in table.columns:
+        if pd.api.types.is_numeric_dtype(table[col]):
+            table[col] = table[col].map(lambda v: "-" if pd.isna(v) else f"{float(v):.2f}" if abs(float(v)) < 10 else f"{float(v):.1f}")
+        else:
+            table[col] = table[col].fillna("-").astype(str).map(lambda v: _elite_pdf_short(v, 26))
+    shown_labels = [labels[columns.index(col)] for col in cols]
+    tbl = ax.table(
+        cellText=table.values,
+        colLabels=shown_labels,
+        cellLoc="center",
+        colLoc="center",
+        bbox=bbox,
+    )
+    tbl.set_zorder(8)
+    tbl.auto_set_font_size(False)
+    tbl.set_fontsize(font_size)
+    for (row, _), cell in tbl.get_celld().items():
+        cell.set_zorder(8)
+        cell.get_text().set_zorder(9)
+        cell.set_edgecolor("#d7dce5")
+        cell.set_linewidth(0.45)
+        if row == 0:
+            cell.set_facecolor(PDF_NAVY)
+            cell.get_text().set_color("white")
+            cell.get_text().set_weight("bold")
+        else:
+            cell.set_facecolor("#ffffff")
+            cell.get_text().set_color(PDF_INK)
+
+
+def _elite_fig_path(match_id: int, figures: dict, *keys: str, fallback: str) -> Path:
+    for key in keys:
+        filename = figures.get(key)
+        if filename:
+            path = _asset(match_id, filename)
+            if path.exists():
+                return path
+    return _asset(match_id, fallback)
+
+
+def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
+    """Build a fixed-layout coach dossier with Gemini text and web-app figures only."""
+    payload = _report_payload(match_id, meta)
+    if payload.get("error"):
+        raise RuntimeError(payload["error"])
+    analysis = _coach_report_sections(payload)
+
+    _, clusters, _, _ = _prepare_app_data(match_id, meta)
+    clusters_display = _clusters_for_display(clusters)
+    ranking = _load_table(match_id, meta.get("tables", {}).get("ranking_secuencias", "ranking_secuencias.csv"))
+    temporal = pd.DataFrame(payload.get("analisis_temporal", []))
+    top_combined = _report_records_df(payload, "secuencias_criticas")
+    ctx = _match_report_context(match_id, meta)
+    teams = _presentation_teams(match_id, meta)
+    score = _score_text(meta.get("resultado")) or _score_text(meta.get("score")) or _infer_score(
+        match_id, teams["home_id"], teams["away_id"]
+    )
+    metrics = payload.get("metricas_globales", {})
+    executive = payload.get("resumen_ejecutivo", {})
+    momentum = payload.get("momentum_critico", {})
+    figs = meta.get("figures", {})
+    buffer = io.BytesIO()
+    total_pages = 6
+
+    with PdfPages(buffer) as pdf:
+        fig, ax = _elite_pdf_page(f"Informe tactico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
+        _elite_pdf_panel(ax, 0.07, 0.635, 0.86, 0.145, face="#ffffff")
+        _elite_pdf_logo(fig, _logo_path(teams["home_id"]), (0.095, 0.655, 0.075, 0.095))
+        _elite_pdf_logo(fig, _logo_path(teams["away_id"]), (0.83, 0.655, 0.075, 0.095))
+        ax.text(0.19, 0.705, teams["home_name"], transform=ax.transAxes, fontsize=15, weight="bold", color=PDF_INK, ha="left", va="center")
+        ax.text(0.81, 0.705, teams["away_name"], transform=ax.transAxes, fontsize=15, weight="bold", color=PDF_INK, ha="right", va="center")
+        ax.add_patch(plt.Rectangle((0.455, 0.675), 0.09, 0.06, transform=ax.transAxes, facecolor=PDF_RED, edgecolor="none"))
+        ax.text(0.50, 0.705, _elite_pdf_clean(score), transform=ax.transAxes, fontsize=20, weight="bold", color="white", ha="center", va="center")
+        cards = [
+            ("Secuencias", metrics.get("secuencias_rivales")),
+            ("Tiros / puerta", f"{metrics.get('tiros', '-')} / {metrics.get('tiros_puerta', '-')}"),
+            ("Tipologia repetida", executive.get("tipologia_mas_repetida", "-")),
+            ("Tipologia peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
+            ("Secuencia prioritaria", executive.get("secuencia_prioritaria", "-")),
+            ("Momentum critico", momentum.get("tramo", executive.get("momento_critico", "-"))),
+        ]
+        for idx, (label, value) in enumerate(cards):
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.49 - (idx // 3) * 0.115, 0.26, 0.082, label, value)
+        _elite_pdf_text_panel(ax, 0.07, 0.13, 0.86, 0.165, "Resumen ejecutivo", analysis["resumen_ejecutivo"], max_lines=6)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Tipologia ofensiva rival", "Trayectorias y mapas de calor ya presentes en la pagina web", 2, total_pages)
+        _elite_pdf_add_image(
+            fig,
+            ax,
+            _elite_fig_path(match_id, figs, "trayectorias_cluster", fallback="trayectorias_cluster.png"),
+            (0.065, 0.465, 0.41, 0.29),
+            "Trayectorias por tipologia",
+        )
+        _elite_pdf_add_image(
+            fig,
+            ax,
+            _elite_fig_path(match_id, figs, "mapa_calor_notebook", "mapa_calor_clusters", fallback="mapa_calor_clusters.png"),
+            (0.525, 0.465, 0.41, 0.29),
+            "Mapa de calor por tipologia",
+        )
+        _elite_pdf_table(
+            ax,
+            clusters_display,
+            ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "zona_dominante"],
+            ["Tipologia", "N", "%", "Tiros", "A puerta", "Zona"],
+            [0.07, 0.285, 0.86, 0.12],
+            font_size=7.1,
+            max_rows=4,
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.105, 0.86, 0.145, "Lectura tactica", analysis["tipologia_destacada"], max_lines=5)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Estructura defensiva", "IDD, IPO y causas defensivas prioritarias", 3, total_pages)
+        _elite_pdf_add_image(
+            fig,
+            ax,
+            _elite_fig_path(match_id, figs, "matriz_ddi_ipar", fallback="matriz_ddi_ipar.png"),
+            (0.075, 0.46, 0.38, 0.30),
+            "Matriz IDD - IPO",
+        )
+        _elite_pdf_add_image(
+            fig,
+            ax,
+            _elite_fig_path(match_id, figs, "causas_danio", fallback="causas_danio.png"),
+            (0.545, 0.46, 0.38, 0.30),
+            "Causas principales",
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.17, 0.86, 0.205, "Diagnostico defensivo", analysis["estructura_defensiva"], max_lines=8)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Momentum critico", "Tramo temporal que concentra mayor prioridad defensiva", 4, total_pages)
+        _elite_pdf_add_image(
+            fig,
+            ax,
+            _elite_fig_path(match_id, figs, "evolucion_temporal_tiros", fallback="evolucion_temporal_tiros.png"),
+            (0.10, 0.445, 0.80, 0.31),
+            "Evolucion IDD / IPO con finalizaciones",
+        )
+        momentum_cards = [
+            ("Tramo", momentum.get("tramo", "-")),
+            ("Indice temporal", momentum.get("indice_temporal", "-")),
+            ("Secuencias", momentum.get("secuencias", "-")),
+            ("Tiros", momentum.get("tiros", "-")),
+        ]
+        for idx, (label, value) in enumerate(momentum_cards):
+            _elite_metric_card(ax, 0.10 + idx * 0.205, 0.335, 0.18, 0.075, label, value, accent="#f2c94c" if idx == 1 else PDF_RED)
+        momentum_text = (
+            f"Tramo critico: {_elite_pdf_clean(momentum.get('tramo'))}. "
+            f"{analysis['momentum_critico']}"
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.12, 0.86, 0.165, "Lectura del momentum", momentum_text, max_lines=6)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Secuencias criticas", "Top de acciones que debe revisar primero el cuerpo tecnico", 5, total_pages)
+        _elite_pdf_add_image(
+            fig,
+            ax,
+            _elite_fig_path(match_id, figs, "ranking_secuencias", fallback="ranking_secuencias.png"),
+            (0.16, 0.485, 0.68, 0.265),
+            "Ranking de secuencias prioritarias",
+        )
+        table_source = top_combined if not top_combined.empty else ranking
+        _elite_pdf_table(
+            ax,
+            table_source,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max"],
+            ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT"],
+            [0.07, 0.275, 0.86, 0.13],
+            font_size=7.1,
+            max_rows=5,
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.105, 0.86, 0.135, "Conclusiones sobre secuencias", analysis["secuencias_criticas"], max_lines=5)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Recomendaciones tacticas", "Sintesis final accionable", 6, total_pages)
+        _elite_pdf_text_panel(ax, 0.07, 0.49, 0.40, 0.25, "Prioridad 1 - Tipologia rival", analysis["tipologia_destacada"], max_lines=8)
+        _elite_pdf_text_panel(ax, 0.53, 0.49, 0.40, 0.25, "Prioridad 2 - Bloque defensivo", analysis["estructura_defensiva"], max_lines=8)
+        _elite_pdf_text_panel(ax, 0.07, 0.215, 0.40, 0.20, "Prioridad 3 - Secuencias criticas", analysis["secuencias_criticas"], max_lines=6)
+        _elite_pdf_text_panel(ax, 0.53, 0.215, 0.40, 0.20, "Prioridad 4 - Momentum", analysis["momentum_critico"], max_lines=6)
+        _elite_pdf_text_panel(ax, 0.07, 0.075, 0.86, 0.10, "Plan de trabajo global", analysis["recomendaciones_globales"], max_lines=3)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def render_informe(match_id: int, meta: dict):
+    _page_heading("Informe")
+    _section_intro(
+        "Informe final con Gemini",
+        "Genera un PDF profesional para entrenador con las conclusiones principales del analisis y solo con graficos ya presentes en la pagina web.",
+    )
+    pdf_key = f"gemini_only_report_pdf_{match_id}"
+
+    if st.button("Generar informe", type="primary", use_container_width=True):
+        st.session_state.pop(pdf_key, None)
+        with st.spinner("Gemini esta redactando y montando el informe..."):
+            try:
+                st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
+            except Exception as exc:
+                st.error(f"No se pudo generar el informe con Gemini: {exc}")
+
+    if pdf_key in st.session_state:
+        st.success("Informe generado correctamente.")
+        st.download_button(
+            "Descargar informe en PDF",
+            data=st.session_state[pdf_key],
+            file_name=f"informe_gemini_{match_id}.pdf",
+            mime="application/pdf",
+            type="primary",
             use_container_width=True,
         )
 
