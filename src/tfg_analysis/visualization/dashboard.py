@@ -27,6 +27,11 @@ PITCH_STRIPE_A = "#252d3c"
 PITCH_STRIPE_B = "#252d3c"
 PITCH_LINE = "#edf2fb"
 PITCH_MARKER = "#f8fafc"
+MOMENTUM_ALPHA = 0.88
+MOMENTUM_IDD_WEIGHT = 0.40
+MOMENTUM_IPO_WEIGHT = 0.60
+MOMENTUM_ALERT_THRESHOLD = 0.20
+MOMENTUM_STRESS_THRESHOLD = 0.32
 
 
 def _patron_label(cluster) -> str:
@@ -135,11 +140,45 @@ def _minuto_partido(df: pd.DataFrame) -> pd.Series:
 def preparar_df_temporal(df_def_dinamico: pd.DataFrame, secuencias: pd.DataFrame) -> pd.DataFrame:
     if df_def_dinamico.empty or secuencias.empty:
         return pd.DataFrame()
+    if "minuto_partido" in df_def_dinamico.columns:
+        return df_def_dinamico.copy()
     cols = ["secuencia_rival_id", "period", "start_time_seg", "end_time_seg", "duracion_seg"]
     df = df_def_dinamico.merge(secuencias[[c for c in cols if c in secuencias.columns]], on="secuencia_rival_id", how="left")
     if {"period", "end_time_seg"}.issubset(df.columns):
         df["minuto_partido"] = _minuto_partido(df)
     return df
+
+
+def preparar_momentum_defensivo(df_def_dinamico: pd.DataFrame, secuencias: pd.DataFrame, alpha: float = MOMENTUM_ALPHA) -> tuple[pd.DataFrame, pd.DataFrame]:
+    df = preparar_df_temporal(df_def_dinamico, secuencias)
+    if df.empty or "minuto_partido" not in df.columns:
+        return df, pd.DataFrame(columns=["minuto", "senal", "momentum"])
+    for col in ["minuto_partido", "duracion_seg", "indice_desorganizacion", "indice_peligrosidad_accion"]:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+    df = df.dropna(subset=["minuto_partido"]).sort_values("minuto_partido").copy()
+    df["duracion_seg"] = df.get("duracion_seg", pd.Series(6, index=df.index)).fillna(6).clip(lower=2)
+    df["fin_min"] = df["minuto_partido"] + df["duracion_seg"] / 60
+    df["senal_momentum"] = (
+        MOMENTUM_IDD_WEIGHT * df.get("indice_desorganizacion", pd.Series(0, index=df.index)).fillna(0)
+        + MOMENTUM_IPO_WEIGHT * df.get("indice_peligrosidad_accion", pd.Series(0, index=df.index)).fillna(0)
+    ).clip(0, 1)
+    max_minute = int(max(95, np.ceil(float(df["fin_min"].max()) + 2)))
+    timeline = pd.DataFrame({"minuto": np.arange(0, max_minute + 1, 1)})
+    df["minuto_modelo"] = np.floor(df["minuto_partido"]).astype(int).clip(0, max_minute)
+    signal_by_minute = (
+        df.groupby("minuto_modelo")["senal_momentum"]
+        .apply(lambda values: 1 - float(np.prod(1 - pd.to_numeric(values, errors="coerce").fillna(0).clip(0, 1))))
+        .clip(0, 1)
+    )
+    timeline["senal"] = timeline["minuto"].map(signal_by_minute).fillna(0.0)
+    values = []
+    acc = 0.0
+    for signal in timeline["senal"]:
+        acc = alpha * acc + (1 - alpha) * float(signal)
+        values.append(acc)
+    timeline["momentum"] = np.clip(values, 0, 1)
+    return df, timeline
 
 
 def tabla_kpis_partido(resumen: Mapping, df_def_dinamico: pd.DataFrame, tabla_patrones: pd.DataFrame | None = None) -> pd.DataFrame:
@@ -279,30 +318,57 @@ def plot_evolucion_temporal(df_def_dinamico: pd.DataFrame, secuencias: pd.DataFr
 
 
 def plot_evolucion_temporal_con_tiros(df_def_dinamico: pd.DataFrame, secuencias: pd.DataFrame):
-    fig, axes = plt.subplots(2, 1, figsize=(12, 7), sharex=True)
-    df = preparar_df_temporal(df_def_dinamico, secuencias)
-    if df.empty or "minuto_partido" not in df.columns:
+    df, timeline = preparar_momentum_defensivo(df_def_dinamico, secuencias)
+    if timeline.empty:
         return _empty_fig("Sin datos temporales")
-    for ax, col, color, title in [
-        (axes[0], "indice_desorganizacion", "darkorange", "Desorganizacion defensiva (IDD)"),
-        (axes[1], "indice_peligrosidad_accion", "steelblue", "Peligrosidad rival (IPO)"),
-    ]:
-        ax.plot(df["minuto_partido"], df[col], color=color, marker="o", lw=1.4, ms=4, alpha=0.75)
-        tiros = df[df.get("tipo_finalizacion_tiro", 0) == 1].copy()
+    fig, ax = plt.subplots(figsize=(12, 5.8), facecolor=DARK_FIG_BG)
+    ax.set_facecolor(DARK_PANEL_BG)
+    ymax = max(0.46, min(1.0, float(timeline["momentum"].max()) + 0.08))
+    ax.axhspan(0, MOMENTUM_ALERT_THRESHOLD, color="#2ea05a", alpha=0.14, lw=0)
+    ax.axhspan(MOMENTUM_ALERT_THRESHOLD, MOMENTUM_STRESS_THRESHOLD, color="#f2c94c", alpha=0.15, lw=0)
+    ax.axhspan(MOMENTUM_STRESS_THRESHOLD, 1, color="#c8102e", alpha=0.13, lw=0)
+    ax.axhline(MOMENTUM_ALERT_THRESHOLD, color="#f2c94c", ls="--", lw=1.2, alpha=0.75)
+    ax.axhline(MOMENTUM_STRESS_THRESHOLD, color="#c8102e", ls="--", lw=1.2, alpha=0.8)
+    ax.fill_between(timeline["minuto"], timeline["momentum"], 0, color="#f4f6fb", alpha=0.08)
+    ax.plot(timeline["minuto"], timeline["momentum"], color="#f4f6fb", lw=3.2, label="Momentum defensivo")
+    if not df.empty:
+        tiros = df[pd.to_numeric(df.get("tipo_finalizacion_tiro", pd.Series(0, index=df.index)), errors="coerce").fillna(0).gt(0)].copy()
         if not tiros.empty:
-            minuto_tiro = np.where(tiros.get("match_time_tiro_oficial", pd.Series(np.nan, index=tiros.index)).notna(), tiros["match_time_tiro_oficial"] / 60000, tiros["minuto_partido"])
-            ax.scatter(minuto_tiro, tiros[col], s=85, facecolors="white", edgecolors="black", linewidths=1.4, label="Tiro oficial")
-            tiros_pt = tiros[tiros.get("tipo_finalizacion_tiro_puerta", 0) == 1]
+            minuto_tiro = np.where(
+                tiros.get("match_time_tiro_oficial", pd.Series(np.nan, index=tiros.index)).notna(),
+                tiros["match_time_tiro_oficial"] / 60000,
+                tiros["minuto_partido"],
+            )
+            y_vals = np.interp(minuto_tiro, timeline["minuto"], timeline["momentum"])
+            ax.scatter(minuto_tiro, y_vals + 0.018, s=82, facecolors="white", edgecolors="#111827", linewidths=1.3, label="Tiro")
+            tiros_pt = tiros[pd.to_numeric(tiros.get("tipo_finalizacion_tiro_puerta", pd.Series(0, index=tiros.index)), errors="coerce").fillna(0).gt(0)]
             if not tiros_pt.empty:
-                minuto_pt = np.where(tiros_pt.get("match_time_tiro_oficial", pd.Series(np.nan, index=tiros_pt.index)).notna(), tiros_pt["match_time_tiro_oficial"] / 60000, tiros_pt["minuto_partido"])
-                ax.scatter(minuto_pt, tiros_pt[col], s=115, facecolors="none", edgecolors="black", linewidths=2.4, label="Tiro a puerta")
-        ax.axvline(45, color="0.4", linestyle="--", lw=1)
-        ax.set_ylabel(col.replace("indice_", "").replace("_", " ").upper())
-        ax.set_ylim(0, 1)
-        ax.set_title(title)
-        ax.grid(alpha=0.25)
-        ax.legend(loc="upper left")
-    axes[-1].set_xlabel("Minuto de partido")
+                minuto_pt = np.where(
+                    tiros_pt.get("match_time_tiro_oficial", pd.Series(np.nan, index=tiros_pt.index)).notna(),
+                    tiros_pt["match_time_tiro_oficial"] / 60000,
+                    tiros_pt["minuto_partido"],
+                )
+                y_pt = np.interp(minuto_pt, timeline["minuto"], timeline["momentum"])
+                ax.scatter(minuto_pt, y_pt + 0.032, s=118, facecolors="none", edgecolors="#57a0ff", linewidths=2.2, label="Tiro a puerta")
+    ax.text(1, MOMENTUM_ALERT_THRESHOLD / 2, "CONTROLADO", color="#8ee1ad", fontsize=10, weight="bold", va="center")
+    ax.text(1, (MOMENTUM_ALERT_THRESHOLD + MOMENTUM_STRESS_THRESHOLD) / 2, "ALERTA", color="#f2c94c", fontsize=10, weight="bold", va="center")
+    ax.text(1, min(ymax - 0.02, MOMENTUM_STRESS_THRESHOLD + 0.04), "ESTRES ALTO", color="#ff8a9b", fontsize=10, weight="bold", va="center")
+    ax.axvline(45, color="white", linestyle=":", lw=1.2, alpha=0.45)
+    ax.text(46, ymax * 0.95, "Descanso", color="#d8deea", fontsize=9)
+    ax.set_xlim(0, int(timeline["minuto"].max()))
+    ax.set_ylim(0, ymax)
+    ax.set_title("Momentum defensivo acumulado (EWMA)", color=TEXT_LIGHT, fontsize=17, weight="bold", pad=14)
+    ax.set_xlabel("Minuto de partido", color=TEXT_LIGHT)
+    ax.set_ylabel("Presion acumulada", color=TEXT_LIGHT)
+    ax.tick_params(colors="#d6deed")
+    ax.grid(color="white", alpha=0.10)
+    for spine in ax.spines.values():
+        spine.set_color("#5f6b7d")
+    legend = ax.legend(loc="upper right", frameon=True)
+    legend.get_frame().set_facecolor("#1b2433")
+    legend.get_frame().set_edgecolor("#5f6b7d")
+    for text in legend.get_texts():
+        text.set_color(TEXT_LIGHT)
     fig.tight_layout()
     return fig
 

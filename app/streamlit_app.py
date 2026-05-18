@@ -4997,6 +4997,16 @@ MOMENTUM_INFO = (
 )
 
 
+MOMENTUM_INFO = (
+    "Construccion del momentum defensivo: acumula la presion rival minuto a minuto.\n"
+    "40% IDD: Indice de Desorganizacion Defensiva. Aporta el peso de la deformacion del bloque.\n"
+    "60% IPO: Indice de Peligrosidad Ofensiva Rival. Tiene mayor peso porque el modelo mide presion acumulada rival.\n"
+    "EWMA: M(t)=0.88*M(t-1)+0.12*(0.40*IDD+0.60*IPO).\n"
+    "Memoria 88%: la curva conserva parte del valor anterior para que varias acciones seguidas mantengan la presion.\n"
+    "Uso: primero mira la curva, despues revisa las alertas y las secuencias del tramo critico."
+)
+
+
 def _fallback_summary_family_notes(metric_map: dict[str, object]) -> dict[str, str]:
     pattern = _format_metric(metric_map.get("Tipología Más Peligrosa", "-"))
     zone = _format_metric(metric_map.get("Zona Más Dañada", "-"))
@@ -7185,6 +7195,13 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         )
 
 
+MOMENTUM_ALPHA = 0.88
+MOMENTUM_IDD_WEIGHT = 0.40
+MOMENTUM_IPO_WEIGHT = 0.60
+MOMENTUM_ALERT_THRESHOLD = 0.20
+MOMENTUM_STRESS_THRESHOLD = 0.32
+
+
 def _chronology_base(seq: pd.DataFrame) -> pd.DataFrame:
     required = ["minuto_partido", "secuencia_rival_id"]
     if seq.empty or not set(required).issubset(seq.columns):
@@ -7215,11 +7232,39 @@ def _chronology_base(seq: pd.DataFrame) -> pd.DataFrame:
     xt = df.get("xT_max", pd.Series(0, index=df.index)).fillna(0)
     df["xt_norm"] = (xt / max(float(xt.quantile(0.90)) if len(xt) else 0.22, 0.12)).clip(0, 1)
     df["entra_ultimo_tercio"] = df.get("x_max_norm_m", pd.Series(0, index=df.index)).fillna(0).ge(FIELD_LENGTH_M * (2 / 3)).astype(float)
-    df["momentum_evento"] = (0.35 * df["ddi"] + 0.35 * df["ipar"] + 0.20 * df["xt_norm"] + 0.10 * df["entra_ultimo_tercio"]).clip(0, 1.25)
+    df["momentum_evento"] = (
+        MOMENTUM_IDD_WEIGHT * df["ddi"] + MOMENTUM_IPO_WEIGHT * df["ipar"]
+    ).clip(0, 1)
     df["tipologia"] = df.get("tipologia", pd.Series("Tipología no identificada", index=df.index)).fillna("Tipología no identificada").astype(str)
     lane_col = "y_fin" if "y_fin" in df.columns else "ball_y_fin_m" if "ball_y_fin_m" in df.columns else None
     df["carril"] = df[lane_col].apply(_lane_from_y) if lane_col else "Desconocido"
     return df
+
+
+def _defensive_momentum_timeline(df: pd.DataFrame, alpha: float = MOMENTUM_ALPHA) -> pd.DataFrame:
+    if df.empty:
+        return pd.DataFrame(columns=["minuto", "senal", "momentum"])
+    max_minute = int(max(95, np.ceil(float(df["fin_min"].max()) + 2)))
+    timeline = pd.DataFrame({"minuto": np.arange(0, max_minute + 1, 1)})
+    event_df = df.dropna(subset=["minuto_partido"]).copy()
+    if event_df.empty:
+        timeline["senal"] = 0.0
+        timeline["momentum"] = 0.0
+        return timeline
+    event_df["minuto_modelo"] = np.floor(event_df["minuto_partido"]).astype(int).clip(0, max_minute)
+    signal_by_minute = (
+        event_df.groupby("minuto_modelo")["momentum_evento"]
+        .apply(lambda values: 1 - float(np.prod(1 - pd.to_numeric(values, errors="coerce").fillna(0).clip(0, 1))))
+        .clip(0, 1)
+    )
+    timeline["senal"] = timeline["minuto"].map(signal_by_minute).fillna(0.0)
+    values = []
+    acc = 0.0
+    for signal in timeline["senal"]:
+        acc = alpha * acc + (1 - alpha) * float(signal)
+        values.append(acc)
+    timeline["momentum"] = np.clip(values, 0, 1)
+    return timeline
 
 
 def _chronology_windows(df: pd.DataFrame) -> pd.DataFrame:
@@ -7235,7 +7280,6 @@ def _chronology_windows(df: pd.DataFrame) -> pd.DataFrame:
             secuencias=("secuencia_rival_id", "count"),
             ddi=("ddi", "mean"),
             ipar=("ipar", "mean"),
-            momentum=("momentum_evento", "mean"),
             tiros=("tipo_finalizacion_tiro", "sum") if "tipo_finalizacion_tiro" in tmp.columns else ("momentum_evento", "size"),
             tiros_puerta=("tipo_finalizacion_tiro_puerta", "sum") if "tipo_finalizacion_tiro_puerta" in tmp.columns else ("momentum_evento", "size"),
             goles=("es_gol", "sum") if "es_gol" in tmp.columns else ("momentum_evento", "size"),
@@ -7243,15 +7287,27 @@ def _chronology_windows(df: pd.DataFrame) -> pd.DataFrame:
         )
         .reset_index()
     )
-    max_seq = max(float(grouped["secuencias"].max()), 1.0)
-    max_shots = max(float(grouped["tiros"].max()), 1.0)
+    timeline = _defensive_momentum_timeline(tmp)
+    if not timeline.empty:
+        timeline["tramo"] = pd.cut(timeline["minuto"], bins=bins, labels=labels, include_lowest=True)
+        momentum_windows = (
+            timeline.groupby("tramo", observed=False)
+            .agg(
+                momentum=("momentum", "mean"),
+                momentum_p90=("momentum", lambda s: float(pd.Series(s).quantile(0.90))),
+                momentum_max=("momentum", "max"),
+            )
+            .reset_index()
+        )
+        grouped = grouped.merge(momentum_windows, on="tramo", how="left")
+    else:
+        grouped["momentum"] = 0.0
+        grouped["momentum_p90"] = 0.0
+        grouped["momentum_max"] = 0.0
     grouped["stress"] = (
-        0.26 * (grouped["secuencias"] / max_seq)
-        + 0.24 * grouped["ddi"].fillna(0)
-        + 0.24 * grouped["ipar"].fillna(0)
-        + 0.16 * (grouped["tiros"].fillna(0) / max_shots)
-        + 0.10 * (grouped["entradas_ultimo_tercio"].fillna(0) / grouped["secuencias"].replace(0, np.nan)).fillna(0)
-    )
+        0.60 * grouped["momentum_p90"].fillna(0)
+        + 0.40 * grouped["momentum"].fillna(0)
+    ).clip(0, 1)
     return grouped
 
 
@@ -7316,6 +7372,12 @@ def _render_temporal_alert_card(df: pd.DataFrame, window: pd.Series, tone: str, 
         "warning": "Tramo a vigilar: no es el peor pico, pero acumula señales suficientes para revisar contexto.",
         "stable": "Referencia estable: tramo con menor estrés relativo y mejor control defensivo dentro del partido.",
     }.get(tone, "")
+    if tone == "critical":
+        tone_text = "Prioridad maxima: tramo donde la curva EWMA de presion rival se mantiene mas alta."
+    elif tone == "warning":
+        tone_text = "Tramo a vigilar: no es el peor pico, pero conserva presion acumulada suficiente para revisar contexto."
+    elif tone == "stable":
+        tone_text = "Referencia estable: tramo con menor estres relativo y mejor control defensivo dentro del partido."
     st.markdown(
         f"""
         <div class="temporal-alert-card temporal-alert-{tone}">
@@ -7365,6 +7427,12 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
         f"la mezcla de IDD {ddi:.2f}, IPO {ipar:.2f} y {shot_zone} entradas al último tercio "
         "marca el momento donde el partido exige revisión prioritaria."
     )
+    interpretation = (
+        f"El rival concentro {sec} secuencias en este tramo y elevo el momentum defensivo con "
+        f"{_short_pattern_name(pattern_txt, 74)}. La zona mas repetida fue {lane_txt}; "
+        f"la combinacion media de IDD {ddi:.2f} e IPO {ipar:.2f} explica el periodo donde "
+        "la presion acumulada exige revision prioritaria."
+    )
     st.markdown(
         f"""
         <div class="chrono-critical-card">
@@ -7376,7 +7444,7 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
             <div><span>{ipar_html}</span><small>IPO medio</small></div>
             <div><span>{shots}</span><small>tiros</small></div>
             <div><span>{shot_zone}</span><small>entradas último tercio</small></div>
-            <div><span>{collapse:.0f}%</span><small>Índice De Colapso</small></div>
+            <div><span>{collapse:.0f}%</span><small>Momentum defensivo</small></div>
             <div><span>{html.escape(_short_pattern_name(pattern_txt, 24))}</span><small>tipología dominante</small></div>
             <div><span>{html.escape(lane_txt)}</span><small>carril dominante</small></div>
           </div>
@@ -7391,25 +7459,21 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
 def _plot_defensive_momentum(df: pd.DataFrame, critical: pd.Series | None):
     if df.empty:
         return
-    max_minute = int(max(95, np.ceil(float(df["fin_min"].max()) + 2)))
-    timeline = pd.DataFrame({"minuto": np.arange(0, max_minute + 1, 1)})
-    impulses = df.groupby(df["minuto_partido"].round().astype(int))["momentum_evento"].sum()
-    timeline["impulso"] = timeline["minuto"].map(impulses).fillna(0)
-    values = []
-    acc = 0.0
-    for impulse in timeline["impulso"]:
-        acc = max(0.0, acc * 0.88 + float(impulse))
-        values.append(acc)
-    max_value = max(max(values), 0.001)
-    timeline["momentum"] = np.array(values) / max_value
+    timeline = _defensive_momentum_timeline(df)
+    if timeline.empty:
+        return
+    max_minute = int(timeline["minuto"].max())
+    y_upper = max(0.46, min(1.0, float(timeline["momentum"].max()) + 0.08))
 
     fig = go.Figure()
-    fig.add_hrect(y0=0, y1=0.38, fillcolor="rgba(46,160,90,0.12)", line_width=0, layer="below")
-    fig.add_hrect(y0=0.38, y1=0.66, fillcolor="rgba(242,201,76,0.12)", line_width=0, layer="below")
-    fig.add_hrect(y0=0.66, y1=1.08, fillcolor="rgba(200,16,46,0.12)", line_width=0, layer="below")
-    fig.add_annotation(x=1, y=0.20, text="CONTROLADO", showarrow=False, font=dict(color="#8ee1ad", size=11), bgcolor="rgba(32,37,50,0.54)")
-    fig.add_annotation(x=1, y=0.52, text="ALERTA", showarrow=False, font=dict(color="#f2c94c", size=11), bgcolor="rgba(32,37,50,0.54)")
-    fig.add_annotation(x=1, y=0.86, text="ESTRES ALTO", showarrow=False, font=dict(color="#ff8a9b", size=11), bgcolor="rgba(32,37,50,0.54)")
+    fig.add_hrect(y0=0, y1=MOMENTUM_ALERT_THRESHOLD, fillcolor="rgba(46,160,90,0.12)", line_width=0, layer="below")
+    fig.add_hrect(y0=MOMENTUM_ALERT_THRESHOLD, y1=MOMENTUM_STRESS_THRESHOLD, fillcolor="rgba(242,201,76,0.12)", line_width=0, layer="below")
+    fig.add_hrect(y0=MOMENTUM_STRESS_THRESHOLD, y1=1.0, fillcolor="rgba(200,16,46,0.12)", line_width=0, layer="below")
+    fig.add_hline(y=MOMENTUM_ALERT_THRESHOLD, line_dash="dot", line_color="rgba(242,201,76,0.65)", line_width=1)
+    fig.add_hline(y=MOMENTUM_STRESS_THRESHOLD, line_dash="dot", line_color="rgba(200,16,46,0.72)", line_width=1)
+    fig.add_annotation(x=1, y=MOMENTUM_ALERT_THRESHOLD / 2, text="CONTROLADO", showarrow=False, font=dict(color="#8ee1ad", size=11), bgcolor="rgba(32,37,50,0.54)")
+    fig.add_annotation(x=1, y=(MOMENTUM_ALERT_THRESHOLD + MOMENTUM_STRESS_THRESHOLD) / 2, text="ALERTA", showarrow=False, font=dict(color="#f2c94c", size=11), bgcolor="rgba(32,37,50,0.54)")
+    fig.add_annotation(x=1, y=min(y_upper - 0.025, MOMENTUM_STRESS_THRESHOLD + 0.035), text="ESTRES ALTO", showarrow=False, font=dict(color="#ff8a9b", size=11), bgcolor="rgba(32,37,50,0.54)")
     if critical is not None and "tramo" in critical:
         tramo = str(critical["tramo"])
         start = float(tramo.split("-")[0].replace("+", ""))
@@ -7449,10 +7513,10 @@ def _plot_defensive_momentum(df: pd.DataFrame, critical: pd.Series | None):
                 hovertemplate=f"{label}<br>Minuto %{{x:.1f}}<extra></extra>",
             )
         )
-    fig.update_layout(title="Curva de momentum defensivo", height=420, showlegend=True, legend=dict(orientation="h", y=-0.22, x=0))
+    fig.update_layout(title="Curva de momentum defensivo (EWMA)", height=420, showlegend=True, legend=dict(orientation="h", y=-0.22, x=0))
     _apply_plotly_theme(fig)
     fig.update_xaxes(title="Minuto de partido", range=[0, max_minute])
-    fig.update_yaxes(title="Presion acumulada", range=[0, 1.08])
+    fig.update_yaxes(title="Presion acumulada", range=[0, y_upper])
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
 
@@ -7512,15 +7576,15 @@ def _render_momentum_formula_note():
         """
         <div class="momentum-formula-card">
           <strong>Como se calcula el momentum defensivo</strong>
-          <span>Cada secuencia rival se transforma primero en un impulso de presion defensiva. Ese impulso mezcla desorganizacion del bloque, amenaza ofensiva, xThreat y profundidad territorial.</span>
+          <span>Cada secuencia rival se transforma primero en una senal de presion defensiva. Esa senal combina desorganizacion del bloque y peligrosidad ofensiva rival.</span>
           <div class="momentum-formula-grid">
-            <div><b>IDD</b><em>35%</em><span>Cuanto mas se rompe la estructura, mas sube la curva.</span></div>
-            <div><b>IPO</b><em>35%</em><span>Prioriza acciones con peligro real o potencial alto.</span></div>
-            <div><b>xT</b><em>20%</em><span>Se normaliza con el P90 del partido para evitar picos aislados.</span></div>
-            <div><b>Ultimo tercio</b><em>10%</em><span>Premia las secuencias que alcanzan zonas profundas.</span></div>
+            <div><b>IDD</b><em>40%</em><span>Cuanto mas se rompe la estructura, mas sube la curva.</span></div>
+            <div><b>IPO</b><em>60%</em><span>Prioriza el agobio rival y el peligro ofensivo generado.</span></div>
+            <div><b>alpha</b><em>0.88</em><span>Conserva memoria temporal de la presion anterior.</span></div>
+            <div><b>EWMA</b><em>12%</em><span>Integra la nueva senal sin que una accion aislada distorsione la lectura.</span></div>
           </div>
-          <span>La curva suma los impulsos por minuto y conserva el 88% del valor del minuto anterior. Por eso una accion aislada genera un pico breve, mientras que varias llegadas seguidas sostienen el momentum rival.</span>
-          <span>Las alertas temporales se calculan en tramos de 15 minutos con una mezcla distinta: 26% volumen de secuencias, 24% IDD, 24% IPO, 16% tiros y 10% entradas al ultimo tercio. Asi se detecta el tramo que combina insistencia, desorden, amenaza y finalizacion.</span>
+          <span>La curva se actualiza como M(t)=0.88*M(t-1)+0.12*(0.40*IDD+0.60*IPO). Por eso una accion aislada genera un pico contenido, mientras que varias llegadas seguidas sostienen el momentum rival.</span>
+          <span>Las alertas temporales se calculan sobre la curva acumulada en tramos de 15 minutos, priorizando los intervalos donde la presion se mantiene mas alta.</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -7538,7 +7602,7 @@ def _render_window_reading(windows: pd.DataFrame):
     calm = readable.sort_values("stress", ascending=True).iloc[0]
     shot_window = readable.sort_values(["tiros", "stress"], ascending=False).iloc[0]
     cols = st.columns(3)
-    cols[0].metric("Tramo más exigente", f"{top['tramo']}'", f"Colapso {float(top['stress']) * 100:.0f}%")
+    cols[0].metric("Tramo más exigente", f"{top['tramo']}'", f"Presión {float(top['stress']) * 100:.0f}%")
     cols[1].metric("Tramo más estable", f"{calm['tramo']}'", f"{int(calm['secuencias'])} secuencias")
     cols[2].metric("Tramo con más remate", f"{shot_window['tramo']}'", f"{int(shot_window['tiros'])} tiros")
 
@@ -7547,11 +7611,11 @@ def _phase_label(row: pd.Series) -> tuple[str, str]:
     stress = float(row.get("stress", 0) or 0)
     shots = float(row.get("tiros", 0) or 0)
     entries = float(row.get("entradas_ultimo_tercio", 0) or 0)
-    if stress >= 0.66 or shots >= 2:
-        return "CRITICO", "Bloque bajo presion: el rival acumula amenaza, entradas profundas o finalizaciones."
-    if stress >= 0.43 or entries >= 2:
+    if stress >= MOMENTUM_STRESS_THRESHOLD or shots >= 2:
+        return "ESTRES ALTO", "Bloque bajo presion acumulada: el rival sostiene amenaza y obliga a defender cerca del area."
+    if stress >= MOMENTUM_ALERT_THRESHOLD or entries >= 2:
         return "ALERTA", "Presion rival creciente: conviene revisar ajustes de carril, saltos y coberturas."
-    return "ESTABLE", "Control defensivo razonable: pocas secuencias de alto impacto en el tramo."
+    return "CONTROLADO", "Control defensivo razonable: pocas secuencias de alto impacto acumulado en el tramo."
 
 
 def _render_phase_blocks(windows: pd.DataFrame):
@@ -7562,7 +7626,7 @@ def _render_phase_blocks(windows: pd.DataFrame):
         if int(row.get("secuencias", 0) or 0) == 0:
             continue
         label, text = _phase_label(row)
-        color = {"ESTABLE": "#2ea05a", "ALERTA": "#f2c94c", "CRITICO": "#c8102e"}[label]
+        color = {"CONTROLADO": "#2ea05a", "ALERTA": "#f2c94c", "ESTRES ALTO": "#c8102e"}[label]
         blocks.append(
             f"""
             <div class="chrono-phase-card" style="border-color:{color};">
