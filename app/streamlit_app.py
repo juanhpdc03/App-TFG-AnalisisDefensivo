@@ -1053,7 +1053,7 @@ def inject_style():
         }
         .club-home-card h1 {
             color: #ffffff !important;
-            font-size: clamp(4.2rem, 6.7vw, 6.4rem) !important;
+            font-size: clamp(2.6rem, 4.2vw, 4.0rem) !important;
             line-height: 1.08;
             margin: 0;
             font-weight: 950;
@@ -1061,8 +1061,8 @@ def inject_style():
         }
         .club-name-large {
             color: #ffffff !important;
-            font-size: clamp(4.2rem, 6.7vw, 6.4rem) !important;
-            line-height: 1.02 !important;
+            font-size: clamp(2.6rem, 4.2vw, 4.0rem) !important;
+            line-height: 1.06 !important;
             font-weight: 950 !important;
             text-transform: none !important;
         }
@@ -3563,6 +3563,10 @@ def _plot_selectable_sequence_bar(
                     line=dict(color=marker_line_colors, width=marker_line_widths),
                 ),
                 hovertemplate="Secuencia %{customdata[1]}<br>%{y:.3f}<extra></extra>",
+                text=[f"{v:.2f}" for v in plot_df[y].astype(float).tolist()],
+                textposition="outside",
+                textfont=dict(color="#f4f6fb", size=14, family="Arial Black"),
+                cliponaxis=False,
             )
         ]
     )
@@ -3572,26 +3576,13 @@ def _plot_selectable_sequence_bar(
         bargap=0.36,
         clickmode="event+select",
         showlegend=False,
-        title=dict(x=0.5, xanchor="center", font=dict(size=22, color="#f4f6fb")),
+        title=dict(text=title, x=0.5, xanchor="center", font=dict(size=22, color="#f4f6fb")),
         height=height,
         dragmode=False,
         paper_bgcolor="#30384a",
         plot_bgcolor="#30384a",
-        shapes=[
-            dict(
-                type="rect",
-                xref="paper",
-                yref="paper",
-                x0=0,
-                y0=0,
-                x1=1,
-                y1=1,
-                line=dict(color="#c8102e", width=1.4),
-                fillcolor="rgba(0,0,0,0)",
-                layer="above",
-            )
-        ],
     )
+    _add_plotly_red_frame(fig, x0=-0.062, y0=-0.16, x1=1.018, y1=1.14)
     max_y = pd.to_numeric(plot_df[y], errors="coerce").max()
     y_range_top = max(float(max_y) * 1.16, 0.1) if pd.notna(max_y) else None
     fig.update_xaxes(
@@ -6624,7 +6615,7 @@ def render_club_home(team: dict):
         <div class="club-home-card">
             <div>{logo}</div>
             <div>
-                <div class="club-name-large" style="font-size:clamp(4.2rem, 6.7vw, 6.4rem) !important;">{html.escape(str(team.get("name", "Equipo")))}</div>
+                <div class="club-name-large" style="font-size:clamp(2.6rem, 4.2vw, 4.0rem) !important;">{html.escape(str(team.get("name", "Equipo")))}</div>
             </div>
         </div>
         """,

@@ -40,7 +40,10 @@ def _preparar_model_frame(
 
     df_model = df_trayectorias.copy()
     if df_features is not None and not df_features.empty:
-        df_model = df_model.merge(df_features, on=join_cols, how="left")
+        # The feature table is the authoritative population of valid sequences.
+        # Keep only trajectories that also have the tactical variables used by the
+        # model so diagnostics, assignments and app counts refer to the same set.
+        df_model = df_model.merge(df_features, on=join_cols, how="inner")
 
     id_cols = [c for c in ["match_id", "secuencia_rival_id"] if c in df_model.columns]
     ids = df_model[id_cols].copy()
