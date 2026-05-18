@@ -3582,7 +3582,6 @@ def _plot_selectable_sequence_bar(
         paper_bgcolor="#30384a",
         plot_bgcolor="#30384a",
     )
-    _add_plotly_red_frame(fig, x0=-0.062, y0=-0.16, x1=1.018, y1=1.14)
     max_y = pd.to_numeric(plot_df[y], errors="coerce").max()
     y_range_top = max(float(max_y) * 1.16, 0.1) if pd.notna(max_y) else None
     fig.update_xaxes(
@@ -3604,6 +3603,8 @@ def _plot_selectable_sequence_bar(
         zeroline=False,
         fixedrange=True,
     )
+    frame_anchor = "critical-sequence-chart-" + re.sub(r"[^a-zA-Z0-9_-]+", "-", str(key))
+    st.markdown(f'<span id="{frame_anchor}" class="critical-sequence-chart-anchor"></span>', unsafe_allow_html=True)
     points = []
     event = st.plotly_chart(
         fig,
@@ -3612,6 +3613,38 @@ def _plot_selectable_sequence_bar(
         key=key,
         on_select="rerun",
         selection_mode="points",
+    )
+    components.html(
+        f"""
+        <script>
+        (() => {{
+          const doc = window.parent.document;
+          const anchorId = {json.dumps(frame_anchor)};
+          function applyCriticalChartFrame() {{
+            const anchor = doc.getElementById(anchorId);
+            if (!anchor) return;
+            const anchorTop = anchor.getBoundingClientRect().top;
+            const charts = Array.from(doc.querySelectorAll('[data-testid="stPlotlyChart"]'));
+            const chart = charts.find((el) => {{
+              const rect = el.getBoundingClientRect();
+              return rect.top >= anchorTop - 8;
+            }});
+            if (!chart) return;
+            chart.style.setProperty("border", "1.5px solid #c8102e", "important");
+            chart.style.setProperty("border-radius", "0", "important");
+            chart.style.setProperty("padding", "10px", "important");
+            chart.style.setProperty("background", "#30384a", "important");
+            chart.style.setProperty("box-sizing", "border-box", "important");
+            chart.style.setProperty("margin-top", "10px", "important");
+            chart.style.setProperty("box-shadow", "none", "important");
+          }}
+          applyCriticalChartFrame();
+          [100, 350, 800, 1400, 2400].forEach((delay) => setTimeout(applyCriticalChartFrame, delay));
+        }})();
+        </script>
+        """,
+        height=0,
+        width=0,
     )
     event_sources = [event, st.session_state.get(key)]
     for source in event_sources:
@@ -9842,6 +9875,267 @@ def render_informe(match_id: int, meta: dict):
             "Descargar informe profesional en PDF",
             data=st.session_state[pdf_key],
             file_name=f"informe_profesional_{match_id}.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+
+
+def _coach_report_sections(payload: dict) -> dict[str, str]:
+    """Strict Gemini report generator: no local fallback for the final report."""
+    api_key = _gemini_api_key()
+    if not api_key:
+        raise RuntimeError("Falta configurar GEMINI_API_KEY en los secretos de la aplicacion.")
+
+    required = [
+        "resumen_ejecutivo",
+        "tipologia_destacada",
+        "estructura_defensiva",
+        "secuencias_criticas",
+        "momentum_critico",
+        "recomendaciones_globales",
+    ]
+    def _extract_report_json(raw_text: str) -> dict:
+        text = str(raw_text or "").strip()
+        text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
+        text = re.sub(r"```$", "", text).strip()
+        candidates = [text]
+        start = text.find("{")
+        end = text.rfind("}")
+        if start >= 0 and end > start:
+            candidates.insert(0, text[start : end + 1])
+        for candidate in candidates:
+            try:
+                parsed = json.loads(candidate)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+        raise ValueError("Respuesta sin JSON valido")
+
+    def _call_gemini(prompt_text: str) -> str:
+        url = GEMINI_API_URL_TEMPLATE.format(model=_gemini_model())
+        body = {
+            "contents": [{"parts": [{"text": prompt_text}]}],
+            "generationConfig": {"temperature": 0.18, "topP": 0.85, "maxOutputTokens": 4096},
+        }
+        response = requests.post(
+            url,
+            headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+            json=body,
+            timeout=90,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return "\n".join(
+            part.get("text", "")
+            for part in data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
+        ).strip()
+
+    prompt = (
+        "Eres analista tactico profesional para un cuerpo tecnico de futbol. "
+        "Redacta un informe final breve, profesional y accionable usando solo el JSON. "
+        "No inventes datos, jugadores ni clips. Devuelve un objeto JSON puro, sin markdown ni texto alrededor, "
+        "con estas claves exactas: "
+        + ", ".join(required)
+        + ". Cada clave debe tener entre 3 y 5 frases utiles para un entrenador. "
+        "Prioriza solo lo mas importante: tipologia destacada, secuencias criticas, momentum critico, "
+        "estructura defensiva y recomendaciones. No uses tablas.\n\n"
+        f"JSON:\n{json.dumps(payload, ensure_ascii=False)}"
+    )
+    text = _call_gemini(prompt)
+    try:
+        parsed = _extract_report_json(text)
+    except ValueError:
+        repair_prompt = (
+            "Convierte el siguiente texto generado por Gemini en un objeto JSON puro, sin markdown ni explicaciones. "
+            "Usa exactamente estas claves: "
+            + ", ".join(required)
+            + ". Manten el contenido tactico y no inventes datos nuevos.\n\n"
+            f"TEXTO:\n{text}"
+        )
+        try:
+            parsed = _extract_report_json(_call_gemini(repair_prompt))
+        except ValueError as exc:
+            raise RuntimeError("Gemini no devolvio un JSON valido para el informe.") from exc
+    missing = [key for key in required if not str(parsed.get(key, "")).strip()]
+    if missing:
+        raise RuntimeError(f"Gemini no devolvio estas secciones del informe: {', '.join(missing)}.")
+    return {key: str(parsed[key]).strip() for key in required}
+
+
+def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
+    """Build the coach PDF with Gemini text and only figures already exposed in the web app."""
+    payload = _report_payload(match_id, meta)
+    if payload.get("error"):
+        raise RuntimeError(payload["error"])
+    analysis = _coach_report_sections(payload)
+
+    seq, clusters, _, _ = _prepare_app_data(match_id, meta)
+    clusters_display = _clusters_for_display(clusters)
+    riesgo = _load_table(match_id, meta["tables"].get("riesgo_resumen", "riesgo_resumen.csv"))
+    ranking = _load_table(match_id, meta["tables"].get("ranking_secuencias", "ranking_secuencias.csv"))
+    temporal = pd.DataFrame(payload.get("analisis_temporal", []))
+    top_combined = _report_records_df(payload, "secuencias_criticas")
+    top_idd = _report_records_df(payload, "secuencias_top_idd")
+    top_ipo = _report_records_df(payload, "secuencias_top_ipo")
+    ctx = _match_report_context(match_id, meta)
+    teams = _presentation_teams(match_id, meta)
+    score = _score_text(meta.get("resultado")) or _score_text(meta.get("score")) or _infer_score(
+        match_id, teams["home_id"], teams["away_id"]
+    )
+    metrics = payload["metricas_globales"]
+    executive = payload.get("resumen_ejecutivo", {})
+    momentum = payload.get("momentum_critico", {})
+    figs = meta.get("figures", {})
+    buffer = io.BytesIO()
+
+    with PdfPages(buffer) as pdf:
+        fig, ax = _pdf_page(f"Informe tactico partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}")
+        _pdf_add_image(fig, _logo_path(teams["home_id"]), (0.075, 0.64, 0.10, 0.14))
+        _pdf_add_image(fig, _logo_path(teams["away_id"]), (0.825, 0.64, 0.10, 0.14))
+        ax.text(0.20, 0.73, teams["home_name"], transform=ax.transAxes, fontsize=16, weight="bold", color="#111827", ha="left")
+        ax.text(0.50, 0.735, score, transform=ax.transAxes, fontsize=24, weight="bold", color="#c8102e", ha="center")
+        ax.text(0.80, 0.73, teams["away_name"], transform=ax.transAxes, fontsize=16, weight="bold", color="#111827", ha="right")
+        cards = [
+            ("Secuencias", metrics.get("secuencias_rivales")),
+            ("Tiros / puerta", f"{metrics.get('tiros')} / {metrics.get('tiros_puerta')}"),
+            ("Tipologia repetida", executive.get("tipologia_mas_repetida", "-")),
+            ("Tipologia peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
+            ("Secuencia video", executive.get("secuencia_prioritaria", "-")),
+            ("Momentum critico", momentum.get("tramo", executive.get("momento_critico", "-"))),
+        ]
+        for idx, (label, value) in enumerate(cards):
+            _metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.47 - (idx // 3) * 0.13, 0.265, 0.095, label, _short_pattern_name(value, 36))
+        y = _pdf_text(ax, 0.07, 0.22, "Resumen ejecutivo", size=14, weight="bold", color="#c8102e")
+        _pdf_text(ax, 0.07, y, analysis["resumen_ejecutivo"], size=10, width=124, line_height=0.026)
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+        fig, ax = _pdf_page("Tipologia ofensiva rival", "Graficos ya disponibles en la pagina web")
+        _pdf_add_image(fig, _asset(match_id, figs.get("trayectorias_cluster", "trayectorias_cluster.png")), (0.05, 0.46, 0.42, 0.29))
+        _pdf_add_image(fig, _asset(match_id, figs.get("mapa_calor_notebook", "mapa_calor_clusters.png")), (0.53, 0.46, 0.42, 0.29))
+        _pdf_table(
+            ax,
+            clusters_display,
+            ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "zona_dominante", "carril_dominante"],
+            ["Tipologia", "N", "%", "Tiros", "A puerta", "Zona", "Carril"],
+            [0.05, 0.10, 0.90, 0.20],
+            font_size=7.4,
+            max_rows=8,
+        )
+        _pdf_text(ax, 0.06, 0.39, analysis["tipologia_destacada"], size=9.4, width=122, line_height=0.024)
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+        fig, ax = _pdf_page("Estructura defensiva", "IDD, IPO y causas defensivas")
+        _pdf_add_image(fig, _asset(match_id, figs.get("matriz_ddi_ipar", "matriz_ddi_ipar.png")), (0.05, 0.43, 0.42, 0.32))
+        _pdf_add_image(fig, _asset(match_id, figs.get("causas_danio", "causas_danio.png")), (0.53, 0.43, 0.42, 0.32))
+        _pdf_table(
+            ax,
+            riesgo,
+            ["cluster_trayectoria", "secuencias", "ddi_medio", "ipar_medio", "tiros", "tiros_puerta"],
+            ["Tip.", "N", "IDD med.", "IPO med.", "Tiros", "A puerta"],
+            [0.05, 0.12, 0.90, 0.18],
+            font_size=8,
+            max_rows=8,
+        )
+        _pdf_text(ax, 0.06, 0.36, analysis["estructura_defensiva"], size=9.4, width=122, line_height=0.024)
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+        fig, ax = _pdf_page("Momentum critico", "Evolucion temporal del partido")
+        _pdf_add_image(fig, _asset(match_id, figs.get("evolucion_temporal_tiros", "evolucion_temporal_tiros.png")), (0.06, 0.40, 0.88, 0.35))
+        _pdf_table(
+            ax,
+            temporal,
+            ["tramo", "secuencias", "ddi_medio", "ipar_medio", "xt_max", "tiros", "tiros_puerta", "goles"],
+            ["Tramo", "N", "IDD", "IPO", "xT max", "Tiros", "A puerta", "Goles"],
+            [0.05, 0.10, 0.90, 0.20],
+            font_size=7.8,
+            max_rows=8,
+        )
+        _pdf_text(
+            ax,
+            0.06,
+            0.35,
+            f"Tramo critico: {momentum.get('tramo', '-')} | indice temporal {momentum.get('indice_temporal', '-')} | secuencias {momentum.get('secuencias', '-')}. {analysis['momentum_critico']}",
+            size=9.2,
+            width=124,
+            line_height=0.023,
+        )
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+        fig, ax = _pdf_page("Secuencias criticas", "Ranking y acciones prioritarias")
+        _pdf_add_image(fig, _asset(match_id, figs.get("ranking_secuencias", "ranking_secuencias.png")), (0.06, 0.47, 0.88, 0.27))
+        _pdf_table(
+            ax,
+            top_combined,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max", "causa_tactica"],
+            ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT", "Causa"],
+            [0.05, 0.12, 0.90, 0.22],
+            font_size=7.1,
+            max_rows=5,
+        )
+        _pdf_text(ax, 0.06, 0.39, analysis["secuencias_criticas"], size=9.2, width=122, line_height=0.023)
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+        fig, ax = _pdf_page("Recomendaciones tacticas", "Sintesis final")
+        _pdf_text(ax, 0.07, 0.74, "Prioridad 1 - Tipologia rival", size=13, weight="bold", color="#c8102e")
+        _pdf_text(ax, 0.07, 0.69, analysis["tipologia_destacada"], size=10, width=58, line_height=0.026)
+        _pdf_text(ax, 0.53, 0.74, "Prioridad 2 - Bloque defensivo", size=13, weight="bold", color="#c8102e")
+        _pdf_text(ax, 0.53, 0.69, analysis["estructura_defensiva"], size=10, width=58, line_height=0.026)
+        _pdf_text(ax, 0.07, 0.42, "Top IDD", size=12, weight="bold", color="#15223b")
+        _pdf_table(
+            ax,
+            top_idd,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_desorganizacion", "indice_peligrosidad_accion"],
+            ["ID", "Min", "Tip.", "IDD", "IPO"],
+            [0.06, 0.18, 0.39, 0.18],
+            font_size=7.4,
+            max_rows=5,
+        )
+        _pdf_text(ax, 0.53, 0.42, "Top IPO", size=12, weight="bold", color="#15223b")
+        _pdf_table(
+            ax,
+            top_ipo,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_peligrosidad_accion", "indice_desorganizacion"],
+            ["ID", "Min", "Tip.", "IPO", "IDD"],
+            [0.52, 0.18, 0.39, 0.18],
+            font_size=7.4,
+            max_rows=5,
+        )
+        _pdf_text(ax, 0.07, 0.12, analysis["recomendaciones_globales"], size=10.2, width=124, line_height=0.026)
+        pdf.savefig(fig, bbox_inches="tight")
+        plt.close(fig)
+
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def render_informe(match_id: int, meta: dict):
+    _page_heading("Informe")
+    _section_intro(
+        "Informe final con Gemini",
+        "Genera un PDF profesional para entrenador con las conclusiones principales del analisis y solo con graficos ya presentes en la pagina web.",
+    )
+    pdf_key = f"gemini_only_report_pdf_{match_id}"
+
+    if st.button("Generar informe", type="primary", use_container_width=True):
+        st.session_state.pop(pdf_key, None)
+        with st.spinner("Gemini esta redactando y montando el informe..."):
+            try:
+                st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
+            except Exception as exc:
+                st.error(f"No se pudo generar el informe con Gemini: {exc}")
+
+    if pdf_key in st.session_state:
+        st.success("Informe generado correctamente.")
+        st.download_button(
+            "Descargar informe en PDF",
+            data=st.session_state[pdf_key],
+            file_name=f"informe_gemini_{match_id}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
