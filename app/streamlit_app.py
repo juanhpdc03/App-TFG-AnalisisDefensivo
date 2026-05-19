@@ -36,6 +36,7 @@ from tfg_analysis.app_data import listar_app_data_disponible
 from tfg_analysis.auth import (
     FirebaseAuthError,
     USER_ROLES,
+    list_teams as firebase_list_teams,
     list_users as firebase_list_users,
     log_action as firebase_log_action,
     login as firebase_login,
@@ -3376,6 +3377,26 @@ def _can_access_team(team_id: int) -> bool:
 def _list_firestore_users() -> list[dict]:
     id_token = str(st.session_state.get("firebase_id_token", ""))
     return firebase_list_users(id_token)
+
+
+def _list_firestore_teams() -> list[dict]:
+    id_token = str(st.session_state.get("firebase_id_token", ""))
+    return firebase_list_teams(id_token)
+
+
+def _team_catalog_names() -> list[str]:
+    try:
+        firestore_teams = _list_firestore_teams()
+    except RuntimeError:
+        firestore_teams = []
+    names = []
+    for team in firestore_teams:
+        name = str(team.get("nombre") or team.get("name") or team.get("short_name") or "").strip()
+        if name:
+            names.append(name)
+    if names:
+        return sorted(dict.fromkeys(names), key=str.lower)
+    return [_team_display_name(team) for team in _registered_teams()]
 
 
 def _update_firestore_user(doc_id: str, email: str, role: str, team: str):
@@ -6933,7 +6954,16 @@ def render_admin_users():
         st.info("Todavia no hay usuarios registrados en Firestore.")
         return
 
-    team_names = [_team_display_name(team) for team in _registered_teams()]
+    team_names = _team_catalog_names()
+    firestore_teams = []
+    try:
+        firestore_teams = _list_firestore_teams()
+    except RuntimeError:
+        firestore_teams = []
+    if firestore_teams:
+        st.caption(f"Equipos cargados desde Firestore: {len(firestore_teams)}")
+    else:
+        st.info("Puedes crear la coleccion equipos en Firestore. Ejemplo: equipos/cd_subiza con nombre='CD Subiza' y categoria='Segunda RFEF'.")
     no_team_label = "Sin equipo asignado"
     for user in users:
         doc_id = str(user.get("_doc_id", ""))

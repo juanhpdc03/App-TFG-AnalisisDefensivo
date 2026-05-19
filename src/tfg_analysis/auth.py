@@ -9,6 +9,7 @@ from tfg_analysis.firebase_config import admin_emails, firebase_auth_client, fir
 USER_ROLES = ("invitado", "analista", "admin")
 USERS_COLLECTION = "usuarios"
 LOGS_COLLECTION = "logs"
+TEAMS_COLLECTION = "equipos"
 
 
 class FirebaseAuthError(RuntimeError):
@@ -108,6 +109,7 @@ def _firebase_auth_rest(action: str, email: str, password: str) -> dict:
     )
     if not response.ok:
         raise FirebaseAuthError(firebase_error(response))
+    log_action(id_token, email, "actualizar_usuario", clean_role, f"Rol={clean_role}; equipo={team if clean_role == 'analista' else ''}")
     return response.json()
 
 
@@ -267,9 +269,24 @@ def list_users(id_token: str) -> list[dict]:
         return []
     if not response.ok:
         raise FirebaseAuthError(firebase_error(response))
-    log_action(id_token, email, "actualizar_usuario", clean_role, f"Rol={clean_role}; equipo={team if clean_role == 'analista' else ''}")
     users = [_parse_firestore_doc(doc) for doc in response.json().get("documents", [])]
     return sorted(users, key=lambda item: str(item.get("email", "")).lower())
+
+
+def list_teams(id_token: str) -> list[dict]:
+    if not firebase_enabled() or not id_token:
+        return []
+    response = requests.get(
+        _firestore_url(TEAMS_COLLECTION),
+        headers=_firestore_headers(id_token),
+        timeout=15,
+    )
+    if response.status_code == 404:
+        return []
+    if not response.ok:
+        return []
+    teams = [_parse_firestore_doc(doc) for doc in response.json().get("documents", [])]
+    return sorted(teams, key=lambda item: str(item.get("nombre", item.get("name", ""))).lower())
 
 
 def update_user(id_token: str, doc_id: str, email: str, role: str, team: str):
