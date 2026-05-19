@@ -64,22 +64,32 @@ BEPRO_LIBRARY_URL_TEMPLATE_DEFAULT = "https://space.bepro.ai/center/library/me/r
 OLLAMA_BASE_URL_DEFAULT = "http://localhost:11434"
 OLLAMA_MODEL_DEFAULT = "llama3.1"
 APP_USERS = {
-    "entrenador": "subiza2026",
-    "juan": "subiza2026",
-    "admin": "subiza2026",
+    "entrenador": "demo2026",
+    "juan": "demo2026",
+    "admin": "demo2026",
 }
+ANONYMIZE_TEAM_IDENTITIES = True
+ANON_TEAM_NAME = "Tu Equipo"
+ANON_RIVAL_PREFIX = "Equipo Rival"
+ANON_RIVAL_IDS: list[int] = []
+for _match_id in sorted(MATCH_PRESENTATION):
+    for _side in ("home_team_id", "away_team_id"):
+        _team_id = MATCH_PRESENTATION[_match_id].get(_side)
+        if _team_id is not None and int(_team_id) != TEAM_ID_DEFAULT and int(_team_id) not in ANON_RIVAL_IDS:
+            ANON_RIVAL_IDS.append(int(_team_id))
+ANON_RIVAL_ORDER = {team_id: idx + 1 for idx, team_id in enumerate(ANON_RIVAL_IDS)}
 REGISTERED_TEAMS = {
     TEAM_ID_DEFAULT: {
-        "name": "CD Subiza",
-        "short_name": "Subiza",
-        "location": "Subiza, Navarra",
+        "name": ANON_TEAM_NAME,
+        "short_name": ANON_TEAM_NAME,
+        "location": "Entorno privado",
         "role": "Equipo registrado",
         "description": (
-            "Primer entorno activo de la plataforma. Incluye tracking, eventing, tipologías ofensivas "
+            "Entorno activo de la plataforma con tracking, eventing, tipologías ofensivas "
             "rivales, estructura defensiva, secuencias críticas, momentum e informe final."
         ),
         "status": "Activo",
-        "access_code": "subiza2026",
+        "access_code": "demo2026",
     }
 }
 
@@ -103,6 +113,15 @@ def _clean_app_text(value):
         if not repaired or repaired == text:
             break
         text = repaired
+    if any(mark in text for mark in ("Ã", "Â", "ï¿½")):
+        for encoding in ("latin1", "cp1252"):
+            try:
+                repaired = text.encode(encoding).decode("utf-8")
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                continue
+            if repaired and repaired != text:
+                text = repaired
+                break
     return text.replace("Â", "").replace("�", "")
 
 
@@ -515,29 +534,87 @@ def inject_style():
             align-items: center;
         }
         .login-visual {
-            min-height: 560px;
+            min-height: 500px;
             border-radius: 8px;
-            padding: 34px;
+            padding: 30px;
             display: flex;
             flex-direction: column;
-            justify-content: flex-end;
+            justify-content: space-between;
             background:
-                linear-gradient(180deg, rgba(10,16,32,0.22), rgba(10,16,32,0.92)),
+                linear-gradient(180deg, rgba(5,10,22,0.62), rgba(5,10,22,0.93)),
                 url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1600&q=80");
             background-size: cover;
-            background-position: center;
+            background-position: center 58%;
             box-shadow: 0 20px 46px rgba(21,34,59,0.24);
+            overflow: hidden;
+        }
+        .login-brand {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            color: #ffffff !important;
+            font-size: .78rem;
+            font-weight: 950;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            opacity: .92;
+        }
+        .login-brand span {
+            color: #d7deec !important;
+            font-size: .72rem;
+            letter-spacing: .05em;
+        }
+        .login-kicker {
+            display: inline-flex;
+            color: #f2c94c !important;
+            font-weight: 900;
+            margin-bottom: 10px;
+            font-size: .92rem;
         }
         .login-visual h1 {
             color: #ffffff !important;
-            font-size: 2.45rem;
+            font-size: clamp(2.0rem, 3.2vw, 3.15rem);
             line-height: 1.04;
             margin: 0 0 10px 0;
+            max-width: 720px;
         }
         .login-visual p {
             color: #eef3ff !important;
-            max-width: 650px;
+            max-width: 610px;
             margin: 0;
+            font-size: 1.02rem;
+            line-height: 1.52;
+        }
+        .login-access-heading {
+            margin: 0 0 16px 0;
+        }
+        .login-access-heading span {
+            display: block;
+            color: #aab3c4 !important;
+            font-size: .82rem;
+            font-weight: 850;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 4px;
+        }
+        .login-access-heading strong {
+            display: block;
+            color: #ffffff !important;
+            font-size: 1.55rem;
+            line-height: 1.1;
+        }
+        .login-access-note {
+            margin-top: 14px;
+            color: #aab3c4 !important;
+            font-size: .92rem;
+            line-height: 1.35;
+        }
+        div[data-testid="stForm"] {
+            border: 1px solid rgba(255,255,255,.08) !important;
+            background: rgba(15,23,42,.30) !important;
+            border-radius: 8px !important;
+            padding: 18px 18px 16px 18px !important;
+            box-shadow: 0 20px 44px rgba(0,0,0,.16) !important;
         }
         .login-panel {
             background: #ffffff;
@@ -1144,7 +1221,7 @@ def inject_style():
         }
         .club-name-large {
             color: #ffffff !important;
-            font-size: clamp(2.6rem, 4.2vw, 4.0rem) !important;
+            font-size: clamp(2.05rem, 3.25vw, 3.05rem) !important;
             line-height: 1.06 !important;
             font-weight: 950 !important;
             text-transform: none !important;
@@ -2948,7 +3025,69 @@ def _asset(match_id: int, filename: str) -> Path:
     return _paths().outputs_dir / "app_data" / str(int(match_id)) / filename
 
 
+def _anonymous_rival_number(team_id) -> int:
+    try:
+        clean_id = int(team_id)
+    except (TypeError, ValueError):
+        return 1
+    return ANON_RIVAL_ORDER.get(clean_id, max(ANON_RIVAL_ORDER.values(), default=0) + 1)
+
+
+def _anonymous_team_name(team_id=None, fallback: str = "Equipo") -> str:
+    if not ANONYMIZE_TEAM_IDENTITIES:
+        return fallback
+    try:
+        clean_id = int(team_id)
+    except (TypeError, ValueError):
+        clean_id = None
+    if clean_id == TEAM_ID_DEFAULT:
+        return ANON_TEAM_NAME
+    if clean_id is not None:
+        return f"{ANON_RIVAL_PREFIX} {_anonymous_rival_number(clean_id)}"
+    fallback_text = str(_clean_app_text(fallback) or fallback)
+    generic_labels = {
+        "",
+        "-",
+        "equipo",
+        "equipo local",
+        "equipo visitante",
+        "equipo rival",
+        "rival",
+        ANON_TEAM_NAME.lower(),
+    }
+    if fallback_text.strip().lower() in generic_labels:
+        return fallback_text or "Equipo"
+    return ANON_RIVAL_PREFIX
+
+
+def _anonymous_badge_path(team_id=None) -> Path | None:
+    if not ANONYMIZE_TEAM_IDENTITIES:
+        return None
+    try:
+        clean_id = int(team_id)
+    except (TypeError, ValueError):
+        clean_id = None
+    if clean_id == TEAM_ID_DEFAULT:
+        filename = "team.png"
+    else:
+        filename = f"rival_{_anonymous_rival_number(clean_id)}.png"
+    path = ROOT / "assets" / "anonymous_badges" / filename
+    if not path.exists() and clean_id != TEAM_ID_DEFAULT:
+        path = ROOT / "assets" / "anonymous_badges" / "rival_1.png"
+    return path if path.exists() else None
+
+
+def _team_display_name(team: dict | None, fallback: str = "Equipo") -> str:
+    if not team:
+        return fallback
+    return _anonymous_team_name(team.get("team_id"), str(team.get("name", fallback)))
+
+
 def _team_logo_html(team_id, fallback: str, css_class: str = "team-badge") -> str:
+    anonymous = _anonymous_badge_path(team_id)
+    if anonymous is not None:
+        data = base64.b64encode(anonymous.read_bytes()).decode("ascii")
+        return f'<span class="{css_class}"><img src="data:image/png;base64,{data}" alt="escudo anonimo"></span>'
     candidates = []
     if team_id is not None:
         candidates.extend(
@@ -2981,6 +3120,8 @@ def _team_name_for_id(meta: dict, team_id, fallback: str = "Equipo") -> str:
         clean_id = int(team_id)
     except (TypeError, ValueError):
         return fallback
+    if ANONYMIZE_TEAM_IDENTITIES:
+        return _anonymous_team_name(clean_id, fallback)
     if clean_id == int(meta.get("team_id", TEAM_ID_DEFAULT)):
         return str(meta.get("team_name", fallback))
     if clean_id == int(meta.get("rival_team_id", -1)):
@@ -3031,8 +3172,8 @@ def _registered_teams() -> list[dict]:
             base = teams.get(team_id, {})
             teams[team_id] = {
                 "team_id": team_id,
-                "name": str(meta.get("team_name", base.get("name", f"Equipo {team_id}"))),
-                "short_name": str(base.get("short_name", meta.get("team_name", f"Equipo {team_id}"))),
+                "name": _anonymous_team_name(team_id, str(meta.get("team_name", base.get("name", f"Equipo {team_id}")))),
+                "short_name": _anonymous_team_name(team_id, str(base.get("short_name", meta.get("team_name", f"Equipo {team_id}")))),
                 "location": str(base.get("location", "Sede no especificada")),
                 "role": str(base.get("role", "Equipo registrado")),
                 "description": str(
@@ -3045,6 +3186,9 @@ def _registered_teams() -> list[dict]:
                 "access_code": str(base.get("access_code", "")),
                 "matches": int(base.get("matches", 0)) + 1,
             }
+    for team in teams.values():
+        team["name"] = _anonymous_team_name(team.get("team_id"), str(team.get("name", "Equipo")))
+        team["short_name"] = _anonymous_team_name(team.get("team_id"), str(team.get("short_name", team.get("name", "Equipo"))))
     return sorted(teams.values(), key=lambda item: str(item.get("name", "")).lower())
 
 
@@ -3082,7 +3226,7 @@ def _team_matches(team_id: int) -> pd.DataFrame:
             teams["away_id"],
         )
         fecha = _match_date_label(match_id)
-        rival = str(meta.get("rival_name", row.get("rival", "Rival")))
+        rival = _team_name_for_id(meta, meta.get("rival_team_id"), str(row.get("rival", "Rival")))
         secuencias = meta.get("resumen", {}).get("n_secuencias_rivales", "-")
         rows.append(
             {
@@ -5222,24 +5366,43 @@ def _render_desorg_metric_blocks(current: pd.DataFrame, diff_ddi: str, diff_ipar
 def render_login() -> bool:
     if st.session_state.get("logged_in"):
         return True
-    left, right = st.columns([1.15, 0.75])
+    left, right = st.columns([1.0, 0.82])
     with left:
         st.markdown(
             """
             <div class="login-visual">
-                <h1>Plataforma de análisis defensivo con tracking y eventing</h1>
-                <p>Un entorno web para clubes y cuerpos técnicos que quieran convertir datos de partido
-                en lecturas tácticas: patrones ofensivos rivales, desorganización defensiva, secuencias
-                críticas, momentum e informes listos para revisar.</p>
+                <div class="login-brand">
+                    <div>Defensive Intelligence</div>
+                    <span>v1.0</span>
+                </div>
+                <div class="login-copy">
+                    <span class="login-kicker">Tracking · Eventing · Tactical Intelligence</span>
+                    <h1>Análisis defensivo avanzado</h1>
+                    <p>Visualiza secuencias críticas, patrones ofensivos rivales y momentos de presión acumulada
+                    a partir de datos de tracking y eventing.</p>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
     with right:
+        st.markdown(
+            """
+            <div class="login-access-heading">
+                <span>Acceso privado</span>
+                <strong>Entrar al panel</strong>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
         with st.form("login_form"):
             user = st.text_input("Usuario")
             password = st.text_input("Contraseña", type="password")
             submitted = st.form_submit_button("Iniciar sesión", type="primary", use_container_width=True)
+        st.markdown(
+            '<div class="login-access-note">Acceso restringido para cuerpo técnico y analistas.</div>',
+            unsafe_allow_html=True,
+        )
         if submitted:
             if APP_USERS.get(user.strip().lower()) == password:
                 st.session_state["logged_in"] = True
@@ -5254,7 +5417,7 @@ def render_login() -> bool:
 def render_topbar(team: dict | None = None):
     title = "Plataforma de análisis defensivo"
     if team:
-        title = f"Panel de análisis de la estructura defensiva | {team.get('name', 'Equipo')}"
+        title = f"Panel de análisis de la estructura defensiva | {_team_display_name(team)}"
     st.markdown(
         f"""
         <div class="app-shell">
@@ -5292,12 +5455,13 @@ def render_global_sidebar():
 
     if view == "analysis" and st.session_state.get("selected_match_id") is not None:
         st.sidebar.divider()
-        logo = _team_logo_html(team.get("team_id"), _initials(str(team.get("name", "EQ"))), "sidebar-crest")
+        team_name = _team_display_name(team)
+        logo = _team_logo_html(team.get("team_id"), _initials(team_name), "sidebar-crest")
         st.sidebar.markdown(
             f"""
             <div class="sidebar-club">
                 {logo}
-                <h2>{html.escape(str(team.get("name", "Equipo")))}</h2>
+                <h2>{html.escape(team_name)}</h2>
                 <p>Análisis defensivo IDD/IPO</p>
             </div>
             """,
@@ -6656,7 +6820,8 @@ def render_portal_home():
     )
     st.markdown('<div class="portal-section-title">Equipos registrados</div>', unsafe_allow_html=True)
     for team in teams:
-        logo = _team_logo_html(team.get("team_id"), _initials(str(team.get("name", "EQ"))), "sidebar-crest")
+        team_name = _team_display_name(team)
+        logo = _team_logo_html(team.get("team_id"), _initials(team_name), "sidebar-crest")
         cols = st.columns([0.82, 0.18], vertical_alignment="center")
         with cols[0]:
             st.markdown(
@@ -6665,7 +6830,7 @@ def render_portal_home():
                 <div class="team-card">
                     <div class="team-card-logo">{logo}</div>
                     <div>
-                        <strong>{html.escape(str(team.get("name", "Equipo")))}</strong>
+                        <strong>{html.escape(team_name)}</strong>
                         <span class="team-pill">{html.escape(str(team.get("status", "Activo")))} · {int(team.get("matches", 0))} partidos</span>
                     </div>
                 </div>
@@ -6682,10 +6847,11 @@ def render_portal_home():
     selected_team_id = st.session_state.get("portal_selected_team_id")
     if selected_team_id is not None:
         selected_team = _team_by_id(int(selected_team_id))
+        selected_team_name = _team_display_name(selected_team)
         st.markdown(
             f"""
             <div class="match-picker-card">
-                <strong>Equipo seleccionado: {html.escape(str(selected_team.get("name", "Equipo")))}</strong>
+                <strong>Equipo seleccionado: {html.escape(selected_team_name)}</strong>
                 <span>{html.escape(str(selected_team.get("status", "Activo")))} · {int(selected_team.get("matches", 0))} partidos disponibles</span>
             </div>
             """,
@@ -6715,13 +6881,14 @@ def render_portal_home():
 def render_club_home(team: dict):
     team_id = int(team["team_id"])
     matches = _team_matches(team_id)
-    logo = _team_logo_html(team_id, _initials(str(team.get("name", "EQ"))), "sidebar-crest")
+    team_name = _team_display_name(team)
+    logo = _team_logo_html(team_id, _initials(team_name), "sidebar-crest")
     st.markdown(
         f"""
         <div class="club-home-card">
             <div>{logo}</div>
             <div>
-                <div class="club-name-large" style="font-size:clamp(2.6rem, 4.2vw, 4.0rem) !important;">{html.escape(str(team.get("name", "Equipo")))}</div>
+                <div class="club-name-large">{html.escape(team_name)}</div>
             </div>
         </div>
         """,
@@ -6771,8 +6938,9 @@ def render_club_home(team: dict):
 def render_analysis_workspace(team: dict, match_id: int):
     meta = _load_metadata(match_id)
     render_topbar(team)
+    team_name = _team_display_name(team)
     st.markdown(
-        f'<div class="app-breadcrumb">Menú principal / {html.escape(str(team.get("name", "Equipo")))} / <b>Partido {int(match_id)}</b></div>',
+        f'<div class="app-breadcrumb">Menú principal / {html.escape(team_name)} / <b>Partido {int(match_id)}</b></div>',
         unsafe_allow_html=True,
     )
     render_hero(meta)
@@ -6830,12 +6998,13 @@ def render_hero(meta: dict):
 
 def sidebar_selector() -> int | None:
     default_team = _team_by_id(TEAM_ID_DEFAULT)
-    sidebar_logo = _team_logo_html(TEAM_ID_DEFAULT, _initials(str(default_team.get("name", "EQ"))), "sidebar-crest")
+    default_team_name = _team_display_name(default_team)
+    sidebar_logo = _team_logo_html(TEAM_ID_DEFAULT, _initials(default_team_name), "sidebar-crest")
     st.sidebar.markdown(
         f"""
         <div class="sidebar-club">
             {sidebar_logo}
-            <h2>{html.escape(str(default_team.get("name", "Equipo")))}</h2>
+            <h2>{html.escape(default_team_name)}</h2>
             <p>Análisis Defensivo IDD/IPO</p>
         </div>
         """,
@@ -6861,13 +7030,19 @@ def sidebar_selector() -> int | None:
     options = app_data["match_id"].dropna().astype(int).tolist()
     match_id = st.sidebar.selectbox("Partido seleccionado", options, index=0)
     row = app_data.loc[app_data["match_id"].astype(int).eq(int(match_id))].iloc[0]
+    row_meta = _load_metadata(int(match_id))
+    anon_rival = _team_name_for_id(row_meta, row_meta.get("rival_team_id"), "Equipo Rival")
     st.sidebar.success("Resultado web disponible")
-    st.sidebar.caption(f"Rival: {row.get('rival', 'Rival')}")
+    st.sidebar.caption(f"Rival: {anon_rival}")
 
     st.sidebar.divider()
     st.sidebar.write("Partidos descargados")
+    sidebar_table = app_data[["match_id", "rival", "modified"]].copy()
+    sidebar_table["rival"] = sidebar_table["match_id"].map(
+        lambda mid: _team_name_for_id(_load_metadata(int(mid)), _load_metadata(int(mid)).get("rival_team_id"), "Equipo Rival")
+    )
     st.sidebar.dataframe(
-        app_data[["match_id", "rival", "modified"]],
+        sidebar_table,
         use_container_width=True,
         hide_index=True,
         height=170,
@@ -7005,7 +7180,7 @@ def render_desorganizacion(match_id: int, meta: dict):
     if seq.empty:
         st.info("No hay detalle por secuencia para este partido. Regenera outputs/app_data para activar esta vista.")
         return
-    team_name = str(meta.get("team_name", "equipo analizado"))
+    team_name = _team_name_for_id(meta, meta.get("team_id", TEAM_ID_DEFAULT), "el equipo analizado")
     _page_heading("Estructura defensiva")
     _section_intro(
         "Lectura general de la estructura defensiva",
@@ -7074,7 +7249,7 @@ def render_secuencias_criticas(match_id: int, meta: dict):
     if seq.empty:
         st.info("No hay detalle por secuencia para este partido.")
         return
-    team_name = str(meta.get("team_name", "el equipo analizado"))
+    team_name = _team_name_for_id(meta, meta.get("team_id", TEAM_ID_DEFAULT), "el equipo analizado")
 
     _page_heading("Secuencias críticas")
     _section_intro(
@@ -8076,8 +8251,9 @@ def _records_for_report(df: pd.DataFrame, cols: list[str], n: int | None = None)
 def _report_payload(match_id: int, meta: dict) -> dict:
     seq, clusters, zona, _ = _prepare_app_data(match_id, meta)
     resumen = meta.get("resumen", {})
-    rival = str(meta.get("rival_name", "Rival"))
     teams = _presentation_teams(match_id, meta)
+    equipo = _team_name_for_id(meta, meta.get("team_id", TEAM_ID_DEFAULT), "Tu Equipo")
+    rival = _team_name_for_id(meta, meta.get("rival_team_id"), "Equipo Rival")
     if seq.empty:
         return {"match_id": int(match_id), "rival": rival, "error": "No hay secuencias suficientes para generar informe táctico."}
 
@@ -8184,7 +8360,7 @@ def _report_payload(match_id: int, meta: dict) -> dict:
     return {
         "match_id": int(match_id),
         "rival": rival,
-        "equipo": meta.get("team_name", "Equipo analizado"),
+        "equipo": equipo,
         "marcador": {
             "local": teams.get("home_name"),
             "visitante": teams.get("away_name"),
@@ -8415,8 +8591,8 @@ def _legacy_tactical_report_unused(match_id: int, meta: dict) -> str:
     if seq.empty:
         return "No hay secuencias suficientes para generar informe táctico."
     resumen = meta.get("resumen", {})
-    rival = str(meta.get("rival_name", "Rival"))
-    team_name = str(meta.get("team_name", "el equipo analizado"))
+    rival = _team_name_for_id(meta, meta.get("rival_team_id"), "Equipo Rival")
+    team_name = _team_name_for_id(meta, meta.get("team_id", TEAM_ID_DEFAULT), "el equipo analizado")
     ddi = pd.to_numeric(seq.get("indice_desorganizacion"), errors="coerce").mean()
     ipar = pd.to_numeric(seq.get("indice_peligrosidad_accion"), errors="coerce").mean()
     high = int(pd.to_numeric(seq.get("indice_peligrosidad_accion"), errors="coerce").gt(0.75).sum())
@@ -8635,7 +8811,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         ax.text(0.50, 0.79, score, transform=ax.transAxes, fontsize=22, weight="bold", color="#c8102e", ha="center")
         ax.text(0.73, 0.79, teams["away_name"], transform=ax.transAxes, fontsize=14, weight="bold", color="#111827", ha="center")
         ax.text(0.10, 0.70, f"Fecha: {ctx['fecha']}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
-        ax.text(0.10, 0.675, f"Rival: {meta.get('rival_name', '-')}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
+        ax.text(0.10, 0.675, f"Rival: {_team_name_for_id(meta, meta.get('rival_team_id'), 'Equipo Rival')}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
         ax.text(0.10, 0.650, f"Competicion: {ctx['competicion']}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
         y = _pdf_section(ax, 0.60, "Resumen global")
         cards = [
@@ -9080,6 +9256,9 @@ def _match_report_context(match_id: int, meta: dict) -> dict:
 def _logo_path(team_id) -> Path | None:
     if team_id is None or pd.isna(team_id):
         return None
+    anon_path = _anonymous_badge_path(team_id)
+    if ANONYMIZE_TEAM_IDENTITIES and anon_path is not None and anon_path.exists():
+        return anon_path
     for suffix in ["png", "jpg", "webp"]:
         path = ROOT / "assets" / "team_logos" / f"{int(team_id)}.{suffix}"
         if path.exists():
@@ -9216,7 +9395,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         ax.text(0.50, 0.755, score, transform=ax.transAxes, fontsize=26, weight="bold", color="#c8102e", ha="center")
         ax.text(0.78, 0.75, teams["away_name"], transform=ax.transAxes, fontsize=17, weight="bold", color="#111827", ha="right")
         ax.text(0.08, 0.62, f"Fecha: {ctx['fecha']}", transform=ax.transAxes, fontsize=11, color="#111827", weight="bold")
-        ax.text(0.08, 0.585, f"Rival: {meta.get('rival_name', '-')}", transform=ax.transAxes, fontsize=11, color="#111827", weight="bold")
+        ax.text(0.08, 0.585, f"Rival: {_team_name_for_id(meta, meta.get('rival_team_id'), 'Equipo Rival')}", transform=ax.transAxes, fontsize=11, color="#111827", weight="bold")
         ax.text(0.08, 0.55, f"Competicion: {ctx['competicion']}", transform=ax.transAxes, fontsize=11, color="#111827", weight="bold")
 
         cards = [
@@ -9371,7 +9550,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         ax.text(0.50, 0.79, score, transform=ax.transAxes, fontsize=22, weight="bold", color="#c8102e", ha="center")
         ax.text(0.73, 0.79, teams["away_name"], transform=ax.transAxes, fontsize=14, weight="bold", color="#111827", ha="center")
         ax.text(0.10, 0.70, f"Fecha: {ctx['fecha']}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
-        ax.text(0.10, 0.675, f"Rival: {meta.get('rival_name', '-')}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
+        ax.text(0.10, 0.675, f"Rival: {_team_name_for_id(meta, meta.get('rival_team_id'), 'Equipo Rival')}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
         ax.text(0.10, 0.650, f"Competicion: {ctx['competicion']}", transform=ax.transAxes, fontsize=9.5, weight="bold", color="#111827")
         y = _pdf_section(ax, 0.60, "Resumen global")
         cards = [
@@ -10318,7 +10497,7 @@ PDF_RED = "#c8102e"
 PDF_NAVY = "#15223b"
 PDF_INK = "#111827"
 PDF_MUTED = "#667085"
-PDF_PAGE_BG = "#f8f1f2"
+PDF_PAGE_BG = "#f4f6fa"
 PDF_PANEL = "#ffffff"
 
 
@@ -10510,9 +10689,11 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 
     _, clusters, _, _ = _prepare_app_data(match_id, meta)
     clusters_display = _clusters_for_display(clusters)
-    ranking = _load_table(match_id, meta.get("tables", {}).get("ranking_secuencias", "ranking_secuencias.csv"))
     temporal = pd.DataFrame(payload.get("analisis_temporal", []))
     top_combined = _report_records_df(payload, "secuencias_criticas")
+    top_idd = _report_records_df(payload, "secuencias_top_idd")
+    top_ipo = _report_records_df(payload, "secuencias_top_ipo")
+    causes = pd.DataFrame(payload.get("causas_defensivas", []))
     ctx = _match_report_context(match_id, meta)
     teams = _presentation_teams(match_id, meta)
     score = _score_text(meta.get("resultado")) or _score_text(meta.get("score")) or _infer_score(
@@ -10527,11 +10708,11 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 
     with PdfPages(buffer) as pdf:
         fig, ax = _elite_pdf_page(f"Informe tactico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
-        _elite_pdf_panel(ax, 0.07, 0.635, 0.86, 0.145, face="#ffffff")
-        _elite_pdf_logo(fig, _logo_path(teams["home_id"]), (0.095, 0.655, 0.075, 0.095))
-        _elite_pdf_logo(fig, _logo_path(teams["away_id"]), (0.83, 0.655, 0.075, 0.095))
-        ax.text(0.19, 0.705, teams["home_name"], transform=ax.transAxes, fontsize=15, weight="bold", color=PDF_INK, ha="left", va="center")
-        ax.text(0.81, 0.705, teams["away_name"], transform=ax.transAxes, fontsize=15, weight="bold", color=PDF_INK, ha="right", va="center")
+        _elite_pdf_panel(ax, 0.07, 0.62, 0.86, 0.155, face="#ffffff")
+        _elite_pdf_logo(fig, _logo_path(teams["home_id"]), (0.095, 0.646, 0.07, 0.09))
+        _elite_pdf_logo(fig, _logo_path(teams["away_id"]), (0.835, 0.646, 0.07, 0.09))
+        ax.text(0.18, 0.704, _elite_pdf_short(teams["home_name"], 26), transform=ax.transAxes, fontsize=15, weight="bold", color=PDF_INK, ha="left", va="center")
+        ax.text(0.82, 0.704, _elite_pdf_short(teams["away_name"], 26), transform=ax.transAxes, fontsize=15, weight="bold", color=PDF_INK, ha="right", va="center")
         ax.add_patch(plt.Rectangle((0.455, 0.675), 0.09, 0.06, transform=ax.transAxes, facecolor=PDF_RED, edgecolor="none"))
         ax.text(0.50, 0.705, _elite_pdf_clean(score), transform=ax.transAxes, fontsize=20, weight="bold", color="white", ha="center", va="center")
         cards = [
@@ -10543,8 +10724,8 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ("Momentum critico", momentum.get("tramo", executive.get("momento_critico", "-"))),
         ]
         for idx, (label, value) in enumerate(cards):
-            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.49 - (idx // 3) * 0.115, 0.26, 0.082, label, value)
-        _elite_pdf_text_panel(ax, 0.07, 0.13, 0.86, 0.165, "Resumen ejecutivo", analysis["resumen_ejecutivo"], max_lines=6)
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.465 - (idx // 3) * 0.112, 0.26, 0.084, label, value)
+        _elite_pdf_text_panel(ax, 0.07, 0.105, 0.86, 0.175, "Resumen ejecutivo", analysis["resumen_ejecutivo"], max_lines=6)
         pdf.savefig(fig)
         plt.close(fig)
 
@@ -10568,85 +10749,113 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             clusters_display,
             ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "zona_dominante"],
             ["Tipologia", "N", "%", "Tiros", "A puerta", "Zona"],
-            [0.07, 0.285, 0.86, 0.12],
+            [0.07, 0.285, 0.86, 0.125],
             font_size=7.1,
             max_rows=4,
         )
-        _elite_pdf_text_panel(ax, 0.07, 0.105, 0.86, 0.145, "Lectura tactica", analysis["tipologia_destacada"], max_lines=5)
+        _elite_pdf_text_panel(ax, 0.07, 0.095, 0.86, 0.155, "Lectura tactica", analysis["tipologia_destacada"], max_lines=5)
         pdf.savefig(fig)
         plt.close(fig)
 
         fig, ax = _elite_pdf_page("Estructura defensiva", "IDD, IPO y causas defensivas prioritarias", 3, total_pages)
-        _elite_pdf_add_image(
-            fig,
+        defensive_cards = [
+            ("IDD medio", metrics.get("ddi_medio", "-")),
+            ("IDD maximo", metrics.get("ddi_max", "-")),
+            ("IPO medio", metrics.get("ipar_medio", "-")),
+            ("IPO maximo", metrics.get("ipar_max", "-")),
+            ("Pitch control rival", metrics.get("pc_rival_medio", "-")),
+            ("Zona mas dañada", metrics.get("zona_mas_danada", "-")),
+        ]
+        for idx, (label, value) in enumerate(defensive_cards):
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.67 - (idx // 3) * 0.11, 0.26, 0.082, label, value)
+        _elite_pdf_table(
             ax,
-            _elite_fig_path(match_id, figs, "matriz_ddi_ipar", fallback="matriz_ddi_ipar.png"),
-            (0.075, 0.46, 0.38, 0.30),
-            "Matriz IDD - IPO",
+            causes,
+            ["causa", "secuencias"],
+            ["Causa", "Secuencias"],
+            [0.07, 0.37, 0.40, 0.13],
+            font_size=7.2,
+            max_rows=5,
         )
-        _elite_pdf_add_image(
-            fig,
+        _elite_pdf_table(
             ax,
-            _elite_fig_path(match_id, figs, "causas_danio", fallback="causas_danio.png"),
-            (0.545, 0.46, 0.38, 0.30),
-            "Causas principales",
+            clusters_display,
+            ["tipologia", "ddi_medio", "ipar_medio", "tiros", "zona_dominante"],
+            ["Tipologia", "IDD", "IPO", "Tiros", "Zona"],
+            [0.53, 0.37, 0.40, 0.13],
+            font_size=7.0,
+            max_rows=4,
         )
-        _elite_pdf_text_panel(ax, 0.07, 0.17, 0.86, 0.205, "Diagnostico defensivo", analysis["estructura_defensiva"], max_lines=8)
+        _elite_pdf_text_panel(ax, 0.07, 0.115, 0.86, 0.20, "Diagnostico defensivo", analysis["estructura_defensiva"], max_lines=7)
         pdf.savefig(fig)
         plt.close(fig)
 
         fig, ax = _elite_pdf_page("Momentum critico", "Tramo temporal que concentra mayor prioridad defensiva", 4, total_pages)
-        _elite_pdf_add_image(
-            fig,
-            ax,
-            _elite_fig_path(match_id, figs, "evolucion_temporal_tiros", fallback="evolucion_temporal_tiros.png"),
-            (0.10, 0.445, 0.80, 0.31),
-            "Evolucion IDD / IPO con finalizaciones",
-        )
         momentum_cards = [
             ("Tramo", momentum.get("tramo", "-")),
             ("Indice temporal", momentum.get("indice_temporal", "-")),
             ("Secuencias", momentum.get("secuencias", "-")),
             ("Tiros", momentum.get("tiros", "-")),
+            ("IDD medio", momentum.get("idd_medio", "-")),
+            ("IPO medio", momentum.get("ipo_medio", "-")),
         ]
         for idx, (label, value) in enumerate(momentum_cards):
-            _elite_metric_card(ax, 0.10 + idx * 0.205, 0.335, 0.18, 0.075, label, value, accent="#f2c94c" if idx == 1 else PDF_RED)
-        momentum_text = (
-            f"Tramo critico: {_elite_pdf_clean(momentum.get('tramo'))}. "
-            f"{analysis['momentum_critico']}"
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.67 - (idx // 3) * 0.11, 0.26, 0.082, label, value, accent="#f2c94c" if idx == 1 else PDF_RED)
+        _elite_pdf_table(
+            ax,
+            temporal,
+            ["tramo", "secuencias", "ddi_medio", "ipar_medio", "xt_max", "tiros", "tiros_puerta", "goles"],
+            ["Tramo", "N", "IDD", "IPO", "xT", "Tiros", "A puerta", "Goles"],
+            [0.07, 0.37, 0.86, 0.14],
+            font_size=7.1,
+            max_rows=7,
         )
-        _elite_pdf_text_panel(ax, 0.07, 0.12, 0.86, 0.165, "Lectura del momentum", momentum_text, max_lines=6)
+        momentum_text = f"Tramo critico: {_elite_pdf_clean(momentum.get('tramo'))}. {analysis['momentum_critico']}"
+        _elite_pdf_text_panel(ax, 0.07, 0.12, 0.86, 0.19, "Lectura del momentum", momentum_text, max_lines=7)
         pdf.savefig(fig)
         plt.close(fig)
 
         fig, ax = _elite_pdf_page("Secuencias criticas", "Top de acciones que debe revisar primero el cuerpo tecnico", 5, total_pages)
-        _elite_pdf_add_image(
-            fig,
-            ax,
-            _elite_fig_path(match_id, figs, "ranking_secuencias", fallback="ranking_secuencias.png"),
-            (0.16, 0.485, 0.68, 0.265),
-            "Ranking de secuencias prioritarias",
-        )
-        table_source = top_combined if not top_combined.empty else ranking
         _elite_pdf_table(
             ax,
-            table_source,
+            top_combined,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max"],
             ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT"],
-            [0.07, 0.275, 0.86, 0.13],
+            [0.07, 0.61, 0.86, 0.15],
             font_size=7.1,
             max_rows=5,
         )
-        _elite_pdf_text_panel(ax, 0.07, 0.105, 0.86, 0.135, "Conclusiones sobre secuencias", analysis["secuencias_criticas"], max_lines=5)
+        _elite_pdf_table(
+            ax,
+            top_idd,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_desorganizacion", "indice_peligrosidad_accion"],
+            ["ID", "Min", "Tipologia", "IDD", "IPO"],
+            [0.07, 0.405, 0.40, 0.13],
+            font_size=6.8,
+            max_rows=5,
+        )
+        _elite_pdf_table(
+            ax,
+            top_ipo,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_peligrosidad_accion", "indice_desorganizacion"],
+            ["ID", "Min", "Tipologia", "IPO", "IDD"],
+            [0.53, 0.405, 0.40, 0.13],
+            font_size=6.8,
+            max_rows=5,
+        )
+        ax.text(0.07, 0.555, "Prioridad combinada", transform=ax.transAxes, fontsize=11, weight="bold", color=PDF_NAVY, va="top")
+        ax.text(0.07, 0.355, "Top IDD", transform=ax.transAxes, fontsize=11, weight="bold", color=PDF_NAVY, va="top")
+        ax.text(0.53, 0.355, "Top IPO", transform=ax.transAxes, fontsize=11, weight="bold", color=PDF_NAVY, va="top")
+        _elite_pdf_text_panel(ax, 0.07, 0.10, 0.86, 0.18, "Conclusiones sobre secuencias", analysis["secuencias_criticas"], max_lines=6)
         pdf.savefig(fig)
         plt.close(fig)
 
         fig, ax = _elite_pdf_page("Recomendaciones tacticas", "Sintesis final accionable", 6, total_pages)
-        _elite_pdf_text_panel(ax, 0.07, 0.49, 0.40, 0.25, "Prioridad 1 - Tipologia rival", analysis["tipologia_destacada"], max_lines=8)
-        _elite_pdf_text_panel(ax, 0.53, 0.49, 0.40, 0.25, "Prioridad 2 - Bloque defensivo", analysis["estructura_defensiva"], max_lines=8)
-        _elite_pdf_text_panel(ax, 0.07, 0.215, 0.40, 0.20, "Prioridad 3 - Secuencias criticas", analysis["secuencias_criticas"], max_lines=6)
-        _elite_pdf_text_panel(ax, 0.53, 0.215, 0.40, 0.20, "Prioridad 4 - Momentum", analysis["momentum_critico"], max_lines=6)
-        _elite_pdf_text_panel(ax, 0.07, 0.065, 0.86, 0.115, "Plan de trabajo global", analysis["recomendaciones_globales"], max_lines=2)
+        _elite_pdf_text_panel(ax, 0.07, 0.52, 0.40, 0.24, "Prioridad 1 - Tipologia rival", analysis["tipologia_destacada"], max_lines=7)
+        _elite_pdf_text_panel(ax, 0.53, 0.52, 0.40, 0.24, "Prioridad 2 - Bloque defensivo", analysis["estructura_defensiva"], max_lines=7)
+        _elite_pdf_text_panel(ax, 0.07, 0.265, 0.40, 0.20, "Prioridad 3 - Secuencias criticas", analysis["secuencias_criticas"], max_lines=5)
+        _elite_pdf_text_panel(ax, 0.53, 0.265, 0.40, 0.20, "Prioridad 4 - Momentum", analysis["momentum_critico"], max_lines=5)
+        _elite_pdf_text_panel(ax, 0.07, 0.075, 0.86, 0.14, "Plan de trabajo global", analysis["recomendaciones_globales"], max_lines=4)
         pdf.savefig(fig)
         plt.close(fig)
 
@@ -10699,8 +10908,9 @@ def main():
     elif view == "club":
         team = _team_by_id(st.session_state.get("selected_team_id"))
         render_topbar(team)
+        team_name = _team_display_name(team)
         st.markdown(
-            f'<div class="app-breadcrumb">Menú principal / <b>{html.escape(str(team.get("name", "Equipo")))}</b></div>',
+            f'<div class="app-breadcrumb">Menú principal / <b>{html.escape(team_name)}</b></div>',
             unsafe_allow_html=True,
         )
         render_club_home(team)

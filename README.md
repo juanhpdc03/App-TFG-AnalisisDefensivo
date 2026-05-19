@@ -5,7 +5,8 @@ tracking, eventing, secuencias ofensivas rivales, tipologias, desorganizacion de
 momentum e informe final.
 
 La app esta preparada como plataforma general: se inicia sesion, se elige un equipo registrado y despues
-se abre el espacio del club con sus partidos analizados. En esta version el equipo cargado es CD Subiza.
+se abre el espacio del club con sus partidos analizados. La interfaz pública anonimiza identidades:
+el equipo analizado aparece como `Tu Equipo` y los rivales como `Equipo Rival 1`, `Equipo Rival 2`, etc.
 
 ## Estructura del repositorio
 
@@ -13,7 +14,7 @@ se abre el espacio del club con sus partidos analizados. En esta version el equi
 app/                         Interfaz Streamlit
 src/tfg_analysis/            Pipeline de analisis y modulos reutilizables
 scripts/                     Scripts de generacion, descarga y automatizacion
-assets/team_logos/           Escudos usados por la app
+assets/anonymous_badges/     Escudos anonimos usados por la app
 eventing_partidos/           Eventing descargado de BePro
 sequences_partidos/          Secuencias descargadas de BePro
 tracking_partidos/           Carpeta local para tracking crudo
@@ -41,8 +42,8 @@ Credenciales demo:
 
 ```text
 Usuario: entrenador
-Contrasena: subiza2026
-Codigo CD Subiza: subiza2026
+Contrasena: demo2026
+Codigo del equipo demo: demo2026
 ```
 
 ## Regenerar analisis ya descargados
