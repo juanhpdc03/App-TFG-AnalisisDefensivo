@@ -50,6 +50,11 @@ from tfg_analysis.index_interpretation import (
     xthreat_reference_text,
 )
 from tfg_analysis.io import listar_tracking_disponible
+from tfg_analysis.validators import (
+    normalize_email,
+    validate_login_credentials,
+    validate_registration_credentials,
+)
 
 
 TEAM_ID_DEFAULT = 12987
@@ -5515,15 +5520,23 @@ def render_login() -> bool:
         with st.form("login_form"):
             user = st.text_input("Correo electrónico")
             password = st.text_input("Contraseña", type="password")
+            password_confirm = ""
+            if mode == "Registrarse":
+                password_confirm = st.text_input("Confirmar contraseña", type="password")
             submitted = st.form_submit_button(mode, type="primary", use_container_width=True)
         st.markdown(
             '<div class="login-access-note">Acceso restringido para cuerpo técnico y analistas.</div>',
             unsafe_allow_html=True,
         )
         if submitted:
-            clean_user = user.strip().lower()
-            if not clean_user or not password:
-                st.error("Introduce usuario/email y contrasena.")
+            clean_user = normalize_email(user)
+            validation_error = (
+                validate_registration_credentials(clean_user, password, password_confirm)
+                if mode == "Registrarse"
+                else validate_login_credentials(clean_user, password)
+            )
+            if validation_error:
+                st.error(validation_error)
             elif mode == "Registrarse":
                 if not _firebase_enabled():
                     st.error("Para registrar usuarios necesitas configurar Firebase en .streamlit/secrets.toml.")
