@@ -41,6 +41,7 @@ from tfg_analysis.auth import (
     log_action as firebase_log_action,
     login as firebase_login,
     register_guest as firebase_register_guest,
+    sync_teams as firebase_sync_teams,
     update_user as firebase_update_user,
 )
 from tfg_analysis.config import FIELD_LENGTH_M, FIELD_WIDTH_M, ProjectPaths
@@ -3384,7 +3385,25 @@ def _list_firestore_teams() -> list[dict]:
     return firebase_list_teams(id_token)
 
 
+def _sync_firestore_teams():
+    id_token = str(st.session_state.get("firebase_id_token", ""))
+    teams = [
+        {
+            "team_id": int(team["team_id"]),
+            "name": _team_display_name(team),
+            "short_name": str(team.get("short_name", _team_display_name(team))),
+        }
+        for team in _registered_teams()
+    ]
+    try:
+        firebase_sync_teams(id_token, teams)
+    except RuntimeError:
+        pass
+
+
 def _team_catalog_names() -> list[str]:
+    if _is_admin():
+        _sync_firestore_teams()
     try:
         firestore_teams = _list_firestore_teams()
     except RuntimeError:
@@ -6961,9 +6980,9 @@ def render_admin_users():
     except RuntimeError:
         firestore_teams = []
     if firestore_teams:
-        st.caption(f"Equipos cargados desde Firestore: {len(firestore_teams)}")
+        st.caption(f"Equipos registrados automaticamente desde datos disponibles: {len(firestore_teams)}")
     else:
-        st.info("Puedes crear la coleccion equipos en Firestore. Ejemplo: equipos/cd_subiza con nombre='CD Subiza' y categoria='Segunda RFEF'.")
+        st.info("La coleccion equipos se sincronizara automaticamente con los equipos que tengan datos procesados en la plataforma.")
     no_team_label = "Sin equipo asignado"
     for user in users:
         doc_id = str(user.get("_doc_id", ""))

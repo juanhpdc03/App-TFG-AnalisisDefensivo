@@ -289,6 +289,31 @@ def list_teams(id_token: str) -> list[dict]:
     return sorted(teams, key=lambda item: str(item.get("nombre", item.get("name", ""))).lower())
 
 
+def sync_teams(id_token: str, teams: list[dict]) -> bool:
+    if not firebase_enabled() or not id_token:
+        return False
+    ok = True
+    for team in teams:
+        try:
+            team_id = int(team.get("team_id"))
+        except (TypeError, ValueError):
+            continue
+        name = str(team.get("name") or team.get("short_name") or f"Equipo {team_id}").strip()
+        payload = {
+            "team_id": team_id,
+            "nombre": name,
+            "activo": True,
+        }
+        response = requests.patch(
+            _firestore_url(f"{TEAMS_COLLECTION}/{team_id}"),
+            headers=_firestore_headers(id_token),
+            json={"fields": _firestore_fields(payload)},
+            timeout=15,
+        )
+        ok = ok and response.ok
+    return ok
+
+
 def update_user(id_token: str, doc_id: str, email: str, role: str, team: str):
     if not firebase_enabled() or not id_token:
         raise FirebaseAuthError("Conecta Firebase para editar usuarios desde la app.")
