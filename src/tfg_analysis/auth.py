@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import requests
 
-from tfg_analysis.firebase_config import firebase_auth_client, firebase_config, firebase_enabled
+from tfg_analysis.firebase_config import admin_emails, firebase_auth_client, firebase_config, firebase_enabled
 
 USER_ROLES = ("guest", "analista", "admin")
 USERS_COLLECTION = "usuarios"
@@ -134,6 +134,12 @@ def save_user_profile(uid: str, id_token: str, profile: dict):
         raise FirebaseAuthError(firebase_error(response))
 
 
+def default_profile_for_email(email: str) -> dict:
+    clean_email = email.strip().lower()
+    role = "admin" if clean_email in admin_emails() else "guest"
+    return {"email": clean_email, "rol": role, "equipo": ""}
+
+
 def load_user_profile(uid: str, id_token: str, email: str) -> dict:
     response = requests.get(
         _firestore_url(f"{USERS_COLLECTION}/{uid}"),
@@ -176,14 +182,24 @@ def load_user_profile(uid: str, id_token: str, email: str) -> dict:
                     except FirebaseAuthError:
                         pass
                 return profile
-    raise FirebaseAuthError("La cuenta existe en Authentication, pero no tiene perfil en Firestore.")
+    profile = default_profile_for_email(email)
+    try:
+        save_user_profile(uid, id_token, profile)
+    except FirebaseAuthError as exc:
+        raise FirebaseAuthError(
+            "La cuenta existe en Authentication, pero no se ha podido crear su perfil en Firestore. "
+            "Revisa que las reglas permitan crear usuarios/{uid} al propio usuario autenticado."
+        ) from exc
+    return profile
 
 
 def register_guest(email: str, password: str) -> tuple[dict, dict]:
     if not firebase_enabled():
         raise FirebaseAuthError("Firebase no esta configurado.")
     auth_data = firebase_sign_up(email, password)
-    profile = {"email": email, "rol": "guest", "equipo": ""}
+    profile = default_profile_for_email(email)
+    if profile["rol"] != "admin":
+        profile["rol"] = "guest"
     save_user_profile(str(auth_data["localId"]), str(auth_data["idToken"]), profile)
     return auth_data, profile
 

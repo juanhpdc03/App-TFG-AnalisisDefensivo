@@ -50,6 +50,28 @@ def firebase_enabled() -> bool:
     return bool(cfg["apiKey"] and cfg["projectId"])
 
 
+def admin_emails() -> set[str]:
+    raw_values: list[str] = []
+    for name in ("FIREBASE_ADMIN_EMAILS", "admin_emails"):
+        value = secret_value(name)
+        if value:
+            raw_values.append(value)
+    try:
+        firebase = st.secrets.get("firebase", {})
+        value = firebase.get("admin_emails") if hasattr(firebase, "get") else None
+        if value:
+            if isinstance(value, str):
+                raw_values.append(value)
+            else:
+                raw_values.extend(str(item) for item in value)
+    except (AttributeError, FileNotFoundError):
+        pass
+    emails: set[str] = set()
+    for value in raw_values:
+        emails.update(part.strip().lower() for part in str(value).split(",") if part.strip())
+    return emails
+
+
 @st.cache_resource(show_spinner=False)
 def firebase_auth_client():
     if pyrebase is None or not firebase_enabled():
