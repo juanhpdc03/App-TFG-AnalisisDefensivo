@@ -5690,7 +5690,7 @@ def render_login() -> bool:
             label_visibility="collapsed",
         )
         with st.form("login_form"):
-            user = st.text_input("Email" if _firebase_enabled() else "Usuario")
+            user = st.text_input("Correo electrónico")
             password = st.text_input("Contraseña", type="password")
             submitted = st.form_submit_button(mode, type="primary", use_container_width=True)
         st.markdown(
