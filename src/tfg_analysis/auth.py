@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 import requests
 
 from tfg_analysis.firebase_config import admin_emails, firebase_auth_client, firebase_config, firebase_enabled
 
 USER_ROLES = ("invitado", "analista", "admin")
 USERS_COLLECTION = "usuarios"
+LOGS_COLLECTION = "logs"
 
 
 class FirebaseAuthError(RuntimeError):
@@ -149,6 +152,25 @@ def save_user_profile(uid: str, id_token: str, profile: dict):
         raise FirebaseAuthError(firebase_error(response))
 
 
+def log_action(id_token: str, email: str, action: str, role: str = "", detail: str = "") -> bool:
+    if not firebase_enabled() or not id_token:
+        return False
+    payload = {
+        "usuario": str(email or "").strip().lower(),
+        "accion": str(action),
+        "rol": normalize_role(role) if role else "",
+        "detalle": str(detail),
+        "fecha": datetime.now(timezone.utc).isoformat(),
+    }
+    response = requests.post(
+        _firestore_url(LOGS_COLLECTION),
+        headers=_firestore_headers(id_token),
+        json={"fields": _firestore_fields(payload)},
+        timeout=10,
+    )
+    return response.ok
+
+
 def default_profile_for_email(email: str) -> dict:
     clean_email = email.strip().lower()
     role = "admin" if clean_email in admin_emails() else "invitado"
@@ -220,6 +242,7 @@ def register_guest(email: str, password: str) -> tuple[dict, dict]:
     if profile["rol"] != "admin":
         profile["rol"] = "invitado"
     save_user_profile(str(auth_data["localId"]), str(auth_data["idToken"]), profile)
+    log_action(str(auth_data["idToken"]), email, "registro", profile.get("rol", ""), "Alta inicial en la plataforma")
     return auth_data, profile
 
 
@@ -228,6 +251,7 @@ def login(email: str, password: str) -> tuple[dict, dict]:
         raise FirebaseAuthError("Firebase no esta configurado.")
     auth_data = firebase_sign_in(email, password)
     profile = load_user_profile(str(auth_data["localId"]), str(auth_data["idToken"]), email)
+    log_action(str(auth_data["idToken"]), email, "login", profile.get("rol", ""), "Inicio de sesion correcto")
     return auth_data, profile
 
 
@@ -243,6 +267,7 @@ def list_users(id_token: str) -> list[dict]:
         return []
     if not response.ok:
         raise FirebaseAuthError(firebase_error(response))
+    log_action(id_token, email, "actualizar_usuario", clean_role, f"Rol={clean_role}; equipo={team if clean_role == 'analista' else ''}")
     users = [_parse_firestore_doc(doc) for doc in response.json().get("documents", [])]
     return sorted(users, key=lambda item: str(item.get("email", "")).lower())
 

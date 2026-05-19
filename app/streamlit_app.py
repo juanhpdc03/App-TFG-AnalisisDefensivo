@@ -37,6 +37,7 @@ from tfg_analysis.auth import (
     FirebaseAuthError,
     USER_ROLES,
     list_users as firebase_list_users,
+    log_action as firebase_log_action,
     login as firebase_login,
     register_guest as firebase_register_guest,
     update_user as firebase_update_user,
@@ -3380,6 +3381,17 @@ def _list_firestore_users() -> list[dict]:
 def _update_firestore_user(doc_id: str, email: str, role: str, team: str):
     id_token = str(st.session_state.get("firebase_id_token", ""))
     firebase_update_user(id_token, doc_id, email, role, team)
+
+
+def _audit_action(action: str, detail: str = ""):
+    id_token = str(st.session_state.get("firebase_id_token", ""))
+    profile = _current_user_profile()
+    email = str(profile.get("email") or st.session_state.get("login_user", ""))
+    role = _current_user_role()
+    try:
+        firebase_log_action(id_token, email, action, role, detail)
+    except RuntimeError:
+        pass
 
 
 def _current_user_label() -> tuple[str, str]:
@@ -11125,6 +11137,7 @@ def main():
     elif view == "club":
         team = _team_by_id(st.session_state.get("selected_team_id"))
         if not _can_access_team(int(team["team_id"])):
+            _audit_action("acceso_bloqueado_club", f"team_id={int(team['team_id'])}")
             st.warning("Tu usuario no tiene permiso para acceder a este club.")
             st.session_state["app_view"] = "portal"
             st.rerun()
@@ -11138,6 +11151,7 @@ def main():
     elif view == "analysis":
         team = _team_by_id(st.session_state.get("selected_team_id"))
         if not _can_access_team(int(team["team_id"])):
+            _audit_action("acceso_bloqueado_analisis", f"team_id={int(team['team_id'])}")
             st.warning("Tu usuario no tiene permiso para acceder a este analisis.")
             st.session_state["app_view"] = "portal"
             st.rerun()
