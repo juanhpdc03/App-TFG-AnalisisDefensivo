@@ -68,6 +68,8 @@ APP_USERS = {
     "juan": "demo2026",
     "admin": "demo2026",
 }
+USER_ROLES = ("guest", "analista", "admin")
+USERS_COLLECTION = "usuarios"
 ANONYMIZE_TEAM_IDENTITIES = True
 ANON_TEAM_NAME = "Tu Equipo"
 ANON_RIVAL_PREFIX = "Equipo Rival"
@@ -3269,10 +3271,296 @@ def _logout():
     st.rerun()
 
 
+def _secret_value(*names: str) -> str:
+    for name in names:
+        try:
+            value = st.secrets[name]
+        except (KeyError, FileNotFoundError):
+            value = None
+        if value:
+            return str(value).strip()
+    try:
+        firebase = st.secrets.get("firebase", {})
+    except (AttributeError, FileNotFoundError):
+        firebase = {}
+    for name in names:
+        value = firebase.get(name) if hasattr(firebase, "get") else None
+        if value:
+            return str(value).strip()
+    return ""
+
+
+def _firebase_config() -> dict:
+    return {
+        "api_key": _secret_value("FIREBASE_API_KEY", "api_key"),
+        "project_id": _secret_value("FIREBASE_PROJECT_ID", "project_id"),
+    }
+
+
+def _firebase_enabled() -> bool:
+    cfg = _firebase_config()
+    return bool(cfg["api_key"] and cfg["project_id"])
+
+
+def _auth_url(action: str) -> str:
+    return f"https://identitytoolkit.googleapis.com/v1/accounts:{action}?key={_firebase_config()['api_key']}"
+
+
+def _firestore_url(path: str) -> str:
+    project_id = _firebase_config()["project_id"]
+    clean_path = path.strip("/")
+    return f"https://firestore.googleapis.com/v1/projects/{project_id}/databases/(default)/documents/{clean_path}"
+
+
+def _firebase_error(response: requests.Response) -> str:
+    try:
+        message = response.json().get("error", {}).get("message", "")
+    except ValueError:
+        message = response.text
+    friendly = {
+        "EMAIL_EXISTS": "Ese correo ya esta registrado.",
+        "EMAIL_NOT_FOUND": "No existe ninguna cuenta con ese correo.",
+        "INVALID_LOGIN_CREDENTIALS": "Usuario o contrasena incorrectos.",
+        "INVALID_PASSWORD": "Usuario o contrasena incorrectos.",
+        "WEAK_PASSWORD : Password should be at least 6 characters": "La contrasena debe tener al menos 6 caracteres.",
+    }
+    return friendly.get(str(message), str(message) or "Firebase no ha aceptado la operacion.")
+
+
+def _firestore_value(value):
+    if isinstance(value, bool):
+        return {"booleanValue": value}
+    if isinstance(value, int):
+        return {"integerValue": str(value)}
+    if isinstance(value, float):
+        return {"doubleValue": value}
+    if value is None:
+        return {"nullValue": None}
+    return {"stringValue": str(value)}
+
+
+def _firestore_fields(data: dict) -> dict:
+    return {key: _firestore_value(value) for key, value in data.items()}
+
+
+def _parse_firestore_value(value: dict):
+    if "stringValue" in value:
+        return value.get("stringValue", "")
+    if "integerValue" in value:
+        try:
+            return int(value.get("integerValue", 0))
+        except (TypeError, ValueError):
+            return value.get("integerValue")
+    if "doubleValue" in value:
+        return float(value.get("doubleValue", 0))
+    if "booleanValue" in value:
+        return bool(value.get("booleanValue"))
+    if "timestampValue" in value:
+        return value.get("timestampValue")
+    return None
+
+
+def _parse_firestore_doc(doc: dict) -> dict:
+    fields = doc.get("fields", {})
+    out = {key: _parse_firestore_value(value) for key, value in fields.items()}
+    name = str(doc.get("name", ""))
+    out["_doc_id"] = name.rsplit("/", 1)[-1] if name else ""
+    return out
+
+
+def _firebase_auth(action: str, email: str, password: str) -> dict:
+    response = requests.post(
+        _auth_url(action),
+        json={"email": email, "password": password, "returnSecureToken": True},
+        timeout=15,
+    )
+    if not response.ok:
+        raise RuntimeError(_firebase_error(response))
+    return response.json()
+
+
+def _firestore_headers(id_token: str) -> dict:
+    return {"Authorization": f"Bearer {id_token}", "Content-Type": "application/json"}
+
+
+def _save_user_profile(uid: str, id_token: str, profile: dict):
+    response = requests.patch(
+        _firestore_url(f"{USERS_COLLECTION}/{uid}"),
+        headers=_firestore_headers(id_token),
+        json={"fields": _firestore_fields(profile)},
+        timeout=15,
+    )
+    if not response.ok:
+        raise RuntimeError(_firebase_error(response))
+
+
+def _load_user_profile(uid: str, id_token: str, email: str) -> dict:
+    response = requests.get(
+        _firestore_url(f"{USERS_COLLECTION}/{uid}"),
+        headers=_firestore_headers(id_token),
+        timeout=15,
+    )
+    if response.ok:
+        profile = _parse_firestore_doc(response.json())
+        if profile.get("email"):
+            return profile
+    if response.status_code not in (403, 404):
+        raise RuntimeError(_firebase_error(response))
+
+    query = {
+        "structuredQuery": {
+            "from": [{"collectionId": USERS_COLLECTION}],
+            "where": {
+                "fieldFilter": {
+                    "field": {"fieldPath": "email"},
+                    "op": "EQUAL",
+                    "value": {"stringValue": email},
+                }
+            },
+            "limit": 1,
+        }
+    }
+    response = requests.post(
+        _firestore_url(":runQuery"),
+        headers=_firestore_headers(id_token),
+        json=query,
+        timeout=15,
+    )
+    if response.ok:
+        for row in response.json():
+            if row.get("document"):
+                profile = _parse_firestore_doc(row["document"])
+                if profile.get("_doc_id") != uid:
+                    try:
+                        _save_user_profile(uid, id_token, {k: v for k, v in profile.items() if not k.startswith("_")})
+                    except RuntimeError:
+                        pass
+                return profile
+    raise RuntimeError("La cuenta existe en Authentication, pero no tiene perfil en Firestore.")
+
+
+def _set_authenticated_session(auth_data: dict, profile: dict):
+    role = str(profile.get("rol", "guest")).strip().lower()
+    if role not in USER_ROLES:
+        role = "guest"
+    st.session_state["logged_in"] = True
+    st.session_state["access_mode"] = "account"
+    st.session_state["login_user"] = profile.get("email") or auth_data.get("email", "")
+    st.session_state["firebase_uid"] = auth_data.get("localId", "")
+    st.session_state["firebase_id_token"] = auth_data.get("idToken", "")
+    st.session_state["user_profile"] = {**profile, "rol": role}
+    st.session_state["app_view"] = "portal"
+
+
+def _register_guest(email: str, password: str):
+    auth_data = _firebase_auth("signUp", email, password)
+    profile = {"email": email, "rol": "guest", "equipo": ""}
+    _save_user_profile(str(auth_data["localId"]), str(auth_data["idToken"]), profile)
+    _set_authenticated_session(auth_data, profile)
+
+
+def _login_firebase(email: str, password: str):
+    auth_data = _firebase_auth("signInWithPassword", email, password)
+    profile = _load_user_profile(str(auth_data["localId"]), str(auth_data["idToken"]), email)
+    _set_authenticated_session(auth_data, profile)
+
+
+def _login_local(user: str, password: str) -> bool:
+    if APP_USERS.get(user.strip().lower()) != password:
+        return False
+    role = "admin" if user.strip().lower() in {"admin", "juan"} else "analista"
+    st.session_state["logged_in"] = True
+    st.session_state["access_mode"] = "account"
+    st.session_state["login_user"] = user.strip()
+    st.session_state["user_profile"] = {"email": user.strip(), "rol": role, "equipo": ANON_TEAM_NAME}
+    st.session_state["app_view"] = "portal"
+    return True
+
+
+def _current_user_profile() -> dict:
+    return dict(st.session_state.get("user_profile") or {"rol": "guest"})
+
+
+def _current_user_role() -> str:
+    role = str(_current_user_profile().get("rol", "guest")).strip().lower()
+    return role if role in USER_ROLES else "guest"
+
+
+def _is_admin() -> bool:
+    return _current_user_role() == "admin"
+
+
+def _is_guest() -> bool:
+    return _current_user_role() == "guest"
+
+
+def _user_allowed_team_ids() -> set[int] | None:
+    if _is_admin():
+        return None
+    if _is_guest():
+        return set()
+    profile = _current_user_profile()
+    assigned = str(profile.get("equipo", "")).strip().lower()
+    if not assigned:
+        return set()
+    allowed: set[int] = set()
+    for team in _registered_teams():
+        names = {
+            str(team.get("team_id", "")).lower(),
+            str(team.get("name", "")).lower(),
+            str(team.get("short_name", "")).lower(),
+            "cd subiza" if int(team.get("team_id", 0)) == TEAM_ID_DEFAULT else "",
+            "subiza" if int(team.get("team_id", 0)) == TEAM_ID_DEFAULT else "",
+        }
+        if assigned in names:
+            allowed.add(int(team["team_id"]))
+    return allowed
+
+
+def _can_access_team(team_id: int) -> bool:
+    allowed = _user_allowed_team_ids()
+    return allowed is None or int(team_id) in allowed
+
+
+def _list_firestore_users() -> list[dict]:
+    id_token = str(st.session_state.get("firebase_id_token", ""))
+    if not (_firebase_enabled() and id_token):
+        return []
+    response = requests.get(
+        _firestore_url(USERS_COLLECTION),
+        headers=_firestore_headers(id_token),
+        timeout=15,
+    )
+    if response.status_code == 404:
+        return []
+    if not response.ok:
+        raise RuntimeError(_firebase_error(response))
+    users = [_parse_firestore_doc(doc) for doc in response.json().get("documents", [])]
+    return sorted(users, key=lambda item: str(item.get("email", "")).lower())
+
+
+def _update_firestore_user(doc_id: str, email: str, role: str, team: str):
+    id_token = str(st.session_state.get("firebase_id_token", ""))
+    if not (_firebase_enabled() and id_token):
+        raise RuntimeError("Conecta Firebase para editar usuarios desde la app.")
+    payload = {"email": email, "rol": role, "equipo": team if role == "analista" else ""}
+    response = requests.patch(
+        _firestore_url(f"{USERS_COLLECTION}/{doc_id}"),
+        headers=_firestore_headers(id_token),
+        json={"fields": _firestore_fields(payload)},
+        timeout=15,
+    )
+    if not response.ok:
+        raise RuntimeError(_firebase_error(response))
+
+
 def _current_user_label() -> tuple[str, str]:
-    mode = str(st.session_state.get("access_mode", "guest"))
-    if mode == "account":
-        return str(st.session_state.get("login_user", "usuario")), "Cuenta registrada"
+    if st.session_state.get("logged_in"):
+        profile = _current_user_profile()
+        role = str(profile.get("rol", "guest")).capitalize()
+        team = str(profile.get("equipo", "")).strip()
+        label = role if not team else f"{role} | {team}"
+        return str(st.session_state.get("login_user", "usuario")), label
     return "Invitado", "Modo de consulta"
 
 
@@ -5395,22 +5683,44 @@ def render_login() -> bool:
             """,
             unsafe_allow_html=True,
         )
+        mode = st.radio(
+            "Tipo de acceso",
+            ["Iniciar sesion", "Registrarse"],
+            horizontal=True,
+            label_visibility="collapsed",
+        )
         with st.form("login_form"):
-            user = st.text_input("Usuario")
+            user = st.text_input("Email" if _firebase_enabled() else "Usuario")
             password = st.text_input("Contraseña", type="password")
-            submitted = st.form_submit_button("Iniciar sesión", type="primary", use_container_width=True)
+            submitted = st.form_submit_button(mode, type="primary", use_container_width=True)
         st.markdown(
             '<div class="login-access-note">Acceso restringido para cuerpo técnico y analistas.</div>',
             unsafe_allow_html=True,
         )
         if submitted:
-            if APP_USERS.get(user.strip().lower()) == password:
-                st.session_state["logged_in"] = True
-                st.session_state["access_mode"] = "account"
-                st.session_state["login_user"] = user.strip()
-                st.session_state["app_view"] = "portal"
+            clean_user = user.strip().lower()
+            if not clean_user or not password:
+                st.error("Introduce usuario/email y contrasena.")
+            elif mode == "Registrarse":
+                if not _firebase_enabled():
+                    st.error("Para registrar usuarios necesitas configurar Firebase en .streamlit/secrets.toml.")
+                else:
+                    try:
+                        _register_guest(clean_user, password)
+                        st.success("Cuenta creada como invitado. Un administrador podra asignarte permisos.")
+                        st.rerun()
+                    except RuntimeError as exc:
+                        st.error(str(exc))
+            elif _firebase_enabled():
+                try:
+                    _login_firebase(clean_user, password)
+                    st.rerun()
+                except RuntimeError as exc:
+                    st.error(str(exc))
+            elif _login_local(clean_user, password):
                 st.rerun()
-            st.error("Usuario o contraseña incorrectos.")
+            else:
+                st.error("Usuario o contraseña incorrectos.")
     return False
 
 
@@ -5436,12 +5746,19 @@ def render_global_sidebar():
         f"""
         <div class="sidebar-account">
             <strong>{html.escape(user)}</strong>
+            <span>{html.escape(role)}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    if view == "club":
+    if _is_admin() and st.sidebar.button("Gestionar usuarios", use_container_width=True):
+        _set_app_view("admin_users")
+
+    if view == "admin_users":
+        if st.sidebar.button("Menu principal", use_container_width=True):
+            _set_app_view("portal")
+    elif view == "club":
         if st.sidebar.button("Menú principal", use_container_width=True):
             _set_app_view("portal")
     elif view == "analysis":
@@ -6754,8 +7071,50 @@ def _build_command(match_id: int | None = None, team_id: int = TEAM_ID_DEFAULT) 
     )
 
 
+def render_admin_users():
+    st.markdown('<div class="portal-section-title">Gestion de usuarios</div>', unsafe_allow_html=True)
+    if not _firebase_enabled():
+        st.warning("Firebase no esta configurado. Anade FIREBASE_API_KEY y FIREBASE_PROJECT_ID en .streamlit/secrets.toml.")
+        return
+    try:
+        users = _list_firestore_users()
+    except RuntimeError as exc:
+        st.error(str(exc))
+        return
+    if not users:
+        st.info("Todavia no hay usuarios registrados en Firestore.")
+        return
+
+    team_names = [_team_display_name(team) for team in _registered_teams()]
+    default_team = team_names[0] if team_names else ANON_TEAM_NAME
+    for user in users:
+        doc_id = str(user.get("_doc_id", ""))
+        email = str(user.get("email", ""))
+        role = str(user.get("rol", "guest")).lower()
+        team = str(user.get("equipo", ""))
+        with st.expander(email or doc_id, expanded=False):
+            role_index = USER_ROLES.index(role) if role in USER_ROLES else 0
+            selected_role = st.selectbox("Rol", USER_ROLES, index=role_index, key=f"user_role_{doc_id}")
+            selected_team = ""
+            if selected_role == "analista":
+                options = team_names or [default_team]
+                index = options.index(team) if team in options else 0
+                selected_team = st.selectbox("Equipo asignado", options, index=index, key=f"user_team_{doc_id}")
+            if st.button("Guardar cambios", key=f"save_user_{doc_id}", type="primary"):
+                try:
+                    _update_firestore_user(doc_id, email, selected_role, selected_team)
+                    st.success("Usuario actualizado.")
+                    st.rerun()
+                except RuntimeError as exc:
+                    st.error(str(exc))
+
+
 def render_portal_home():
     teams = _registered_teams()
+    allowed_team_ids = _user_allowed_team_ids()
+    visible_teams = teams if allowed_team_ids is None or _is_guest() else [
+        team for team in teams if int(team["team_id"]) in allowed_team_ids
+    ]
     st.markdown(
         """
         <div class="portal-landing">
@@ -6819,7 +7178,12 @@ def render_portal_home():
         unsafe_allow_html=True,
     )
     st.markdown('<div class="portal-section-title">Equipos registrados</div>', unsafe_allow_html=True)
-    for team in teams:
+    if _is_guest():
+        st.info("Tu cuenta esta en modo invitado. Puedes ver la portada y los equipos registrados; un administrador puede convertirte en analista y asignarte un club.")
+    elif not visible_teams:
+        st.warning("Tu usuario aun no tiene equipo asignado. Pide a un administrador que revise tu perfil.")
+
+    for team in visible_teams:
         team_name = _team_display_name(team)
         logo = _team_logo_html(team.get("team_id"), _initials(team_name), "sidebar-crest")
         cols = st.columns([0.82, 0.18], vertical_alignment="center")
@@ -6838,7 +7202,8 @@ def render_portal_home():
                 unsafe_allow_html=True,
             )
         with cols[1]:
-            if st.button("Seleccionar", key=f"pick_team_{int(team['team_id'])}", type="primary", use_container_width=True):
+            disabled = _is_guest() or not _can_access_team(int(team["team_id"]))
+            if st.button("Seleccionar", key=f"pick_team_{int(team['team_id'])}", type="primary", use_container_width=True, disabled=disabled):
                 st.session_state["portal_selected_team_id"] = int(team["team_id"])
                 st.session_state.pop("pending_team_access_id", None)
                 st.session_state.pop("team_access_error", None)
@@ -6858,8 +7223,11 @@ def render_portal_home():
             unsafe_allow_html=True,
         )
         if st.button("Entrar en el espacio del equipo", type="primary", use_container_width=True):
-            st.session_state["pending_team_access_id"] = int(selected_team_id)
-            st.session_state.pop("team_access_error", None)
+            if _can_access_team(int(selected_team_id)):
+                _set_app_view("club", int(selected_team_id))
+            else:
+                st.session_state["pending_team_access_id"] = int(selected_team_id)
+                st.session_state.pop("team_access_error", None)
     pending_team_id = st.session_state.get("pending_team_access_id")
     if pending_team_id is not None:
         pending_team = _team_by_id(int(pending_team_id))
@@ -10905,8 +11273,18 @@ def main():
     if view == "portal":
         render_topbar()
         render_portal_home()
+    elif view == "admin_users":
+        if not _is_admin():
+            st.session_state["app_view"] = "portal"
+            st.rerun()
+        render_topbar()
+        render_admin_users()
     elif view == "club":
         team = _team_by_id(st.session_state.get("selected_team_id"))
+        if not _can_access_team(int(team["team_id"])):
+            st.warning("Tu usuario no tiene permiso para acceder a este club.")
+            st.session_state["app_view"] = "portal"
+            st.rerun()
         render_topbar(team)
         team_name = _team_display_name(team)
         st.markdown(
@@ -10916,6 +11294,10 @@ def main():
         render_club_home(team)
     elif view == "analysis":
         team = _team_by_id(st.session_state.get("selected_team_id"))
+        if not _can_access_team(int(team["team_id"])):
+            st.warning("Tu usuario no tiene permiso para acceder a este analisis.")
+            st.session_state["app_view"] = "portal"
+            st.rerun()
         match_id = st.session_state.get("selected_match_id")
         matches = _team_matches(int(team["team_id"]))
         if match_id is None and not matches.empty:
