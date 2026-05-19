@@ -4,7 +4,7 @@ import requests
 
 from tfg_analysis.firebase_config import admin_emails, firebase_auth_client, firebase_config, firebase_enabled
 
-USER_ROLES = ("guest", "analista", "admin")
+USER_ROLES = ("invitado", "analista", "admin")
 USERS_COLLECTION = "usuarios"
 
 
@@ -51,6 +51,21 @@ def _firestore_value(value):
 
 def _firestore_fields(data: dict) -> dict:
     return {key: _firestore_value(value) for key, value in data.items()}
+
+
+def normalize_role(role: str | None) -> str:
+    clean_role = str(role or "invitado").strip().lower()
+    if clean_role == "guest":
+        return "invitado"
+    return clean_role if clean_role in USER_ROLES else "invitado"
+
+
+def normalize_profile(profile: dict) -> dict:
+    out = dict(profile)
+    out["rol"] = normalize_role(out.get("rol"))
+    if out["rol"] != "analista":
+        out.pop("equipo", None)
+    return out
 
 
 def _parse_firestore_value(value: dict):
@@ -136,8 +151,8 @@ def save_user_profile(uid: str, id_token: str, profile: dict):
 
 def default_profile_for_email(email: str) -> dict:
     clean_email = email.strip().lower()
-    role = "admin" if clean_email in admin_emails() else "guest"
-    return {"email": clean_email, "rol": role, "equipo": ""}
+    role = "admin" if clean_email in admin_emails() else "invitado"
+    return {"email": clean_email, "rol": role}
 
 
 def load_user_profile(uid: str, id_token: str, email: str) -> dict:
@@ -149,7 +164,7 @@ def load_user_profile(uid: str, id_token: str, email: str) -> dict:
     if response.ok:
         profile = _parse_firestore_doc(response.json())
         if profile.get("email"):
-            return profile
+            return normalize_profile(profile)
     if response.status_code not in (403, 404):
         raise FirebaseAuthError(firebase_error(response))
 
@@ -178,10 +193,14 @@ def load_user_profile(uid: str, id_token: str, email: str) -> dict:
                 profile = _parse_firestore_doc(row["document"])
                 if profile.get("_doc_id") != uid:
                     try:
-                        save_user_profile(uid, id_token, {k: v for k, v in profile.items() if not k.startswith("_")})
+                        save_user_profile(
+                            uid,
+                            id_token,
+                            normalize_profile({k: v for k, v in profile.items() if not k.startswith("_")}),
+                        )
                     except FirebaseAuthError:
                         pass
-                return profile
+                return normalize_profile(profile)
     profile = default_profile_for_email(email)
     try:
         save_user_profile(uid, id_token, profile)
@@ -199,7 +218,7 @@ def register_guest(email: str, password: str) -> tuple[dict, dict]:
     auth_data = firebase_sign_up(email, password)
     profile = default_profile_for_email(email)
     if profile["rol"] != "admin":
-        profile["rol"] = "guest"
+        profile["rol"] = "invitado"
     save_user_profile(str(auth_data["localId"]), str(auth_data["idToken"]), profile)
     return auth_data, profile
 
@@ -231,11 +250,19 @@ def list_users(id_token: str) -> list[dict]:
 def update_user(id_token: str, doc_id: str, email: str, role: str, team: str):
     if not firebase_enabled() or not id_token:
         raise FirebaseAuthError("Conecta Firebase para editar usuarios desde la app.")
-    payload = {"email": email, "rol": role, "equipo": team if role == "analista" else ""}
+    clean_role = normalize_role(role)
+    payload = {"email": email, "rol": clean_role}
+    if clean_role == "analista":
+        payload["equipo"] = team
     response = requests.patch(
         _firestore_url(f"{USERS_COLLECTION}/{doc_id}"),
         headers=_firestore_headers(id_token),
         json={"fields": _firestore_fields(payload)},
+        params=[
+            ("updateMask.fieldPaths", "email"),
+            ("updateMask.fieldPaths", "rol"),
+            ("updateMask.fieldPaths", "equipo"),
+        ],
         timeout=15,
     )
     if not response.ok:

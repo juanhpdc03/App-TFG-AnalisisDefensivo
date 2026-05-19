@@ -3279,15 +3279,18 @@ def _logout():
 
 
 def _set_authenticated_session(auth_data: dict, profile: dict):
-    role = str(profile.get("rol", "guest")).strip().lower()
+    role = _normalize_user_role(profile.get("rol"))
     if role not in USER_ROLES:
-        role = "guest"
+        role = "invitado"
+    clean_profile = dict(profile)
+    if role != "analista":
+        clean_profile.pop("equipo", None)
     st.session_state["logged_in"] = True
     st.session_state["access_mode"] = "account"
     st.session_state["login_user"] = profile.get("email") or auth_data.get("email", "")
     st.session_state["firebase_uid"] = auth_data.get("localId", "")
     st.session_state["firebase_id_token"] = auth_data.get("idToken", "")
-    st.session_state["user_profile"] = {**profile, "rol": role}
+    st.session_state["user_profile"] = {**clean_profile, "rol": role}
     st.session_state["app_view"] = "portal"
 
 
@@ -3313,13 +3316,19 @@ def _login_local(user: str, password: str) -> bool:
     return True
 
 
+def _normalize_user_role(role: str | None) -> str:
+    clean_role = str(role or "invitado").strip().lower()
+    if clean_role == "guest":
+        return "invitado"
+    return clean_role if clean_role in USER_ROLES else "invitado"
+
+
 def _current_user_profile() -> dict:
-    return dict(st.session_state.get("user_profile") or {"rol": "guest"})
+    return dict(st.session_state.get("user_profile") or {"rol": "invitado"})
 
 
 def _current_user_role() -> str:
-    role = str(_current_user_profile().get("rol", "guest")).strip().lower()
-    return role if role in USER_ROLES else "guest"
+    return _normalize_user_role(_current_user_profile().get("rol"))
 
 
 def _is_admin() -> bool:
@@ -3327,7 +3336,7 @@ def _is_admin() -> bool:
 
 
 def _is_guest() -> bool:
-    return _current_user_role() == "guest"
+    return _current_user_role() == "invitado"
 
 
 def _user_allowed_team_ids() -> set[int] | None:
@@ -3371,7 +3380,7 @@ def _update_firestore_user(doc_id: str, email: str, role: str, team: str):
 def _current_user_label() -> tuple[str, str]:
     if st.session_state.get("logged_in"):
         profile = _current_user_profile()
-        role = str(profile.get("rol", "guest")).capitalize()
+        role = _normalize_user_role(profile.get("rol")).capitalize()
         team = str(profile.get("equipo", "")).strip()
         label = role if not team else f"{role} | {team}"
         return str(st.session_state.get("login_user", "usuario")), label
@@ -6904,7 +6913,7 @@ def render_admin_users():
     for user in users:
         doc_id = str(user.get("_doc_id", ""))
         email = str(user.get("email", ""))
-        role = str(user.get("rol", "guest")).lower()
+        role = _normalize_user_role(user.get("rol"))
         team = str(user.get("equipo", ""))
         with st.expander(email or doc_id, expanded=False):
             role_index = USER_ROLES.index(role) if role in USER_ROLES else 0
