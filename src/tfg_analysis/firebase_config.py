@@ -55,7 +55,10 @@ def firebase_auth_client():
     if pyrebase is None or not firebase_enabled():
         return None
     cfg = {key: value for key, value in firebase_config().items() if value}
-    return pyrebase.initialize_app(cfg).auth()
+    try:
+        return pyrebase.initialize_app(cfg).auth()
+    except Exception:
+        return None
 
 
 @st.cache_resource(show_spinner=False)
