@@ -109,7 +109,6 @@ def _firebase_auth_rest(action: str, email: str, password: str) -> dict:
     )
     if not response.ok:
         raise FirebaseAuthError(firebase_error(response))
-    log_action(id_token, email, "actualizar_usuario", clean_role, f"Rol={clean_role}; equipo={team if clean_role == 'analista' else ''}")
     return response.json()
 
 
@@ -334,3 +333,4 @@ def update_user(id_token: str, doc_id: str, email: str, role: str, team: str):
     )
     if not response.ok:
         raise FirebaseAuthError(firebase_error(response))
+    log_action(id_token, email, "actualizar_usuario", clean_role, f"Rol={clean_role}; equipo={team if clean_role == 'analista' else ''}")
