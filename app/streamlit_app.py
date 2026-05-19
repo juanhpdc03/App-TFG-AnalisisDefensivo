@@ -6900,7 +6900,7 @@ def render_admin_users():
         return
 
     team_names = [_team_display_name(team) for team in _registered_teams()]
-    default_team = team_names[0] if team_names else ANON_TEAM_NAME
+    no_team_label = "Sin equipo asignado"
     for user in users:
         doc_id = str(user.get("_doc_id", ""))
         email = str(user.get("email", ""))
@@ -6909,11 +6909,18 @@ def render_admin_users():
         with st.expander(email or doc_id, expanded=False):
             role_index = USER_ROLES.index(role) if role in USER_ROLES else 0
             selected_role = st.selectbox("Rol", USER_ROLES, index=role_index, key=f"user_role_{doc_id}")
-            selected_team = ""
-            if selected_role == "analista":
-                options = team_names or [default_team]
-                index = options.index(team) if team in options else 0
-                selected_team = st.selectbox("Equipo asignado", options, index=index, key=f"user_team_{doc_id}")
+            team_options = [no_team_label, *(team_names or [ANON_TEAM_NAME])]
+            selected_team_index = team_options.index(team) if team in team_options else 0
+            selected_team_label = st.selectbox(
+                "Equipo asignado",
+                team_options,
+                index=selected_team_index,
+                disabled=selected_role != "analista",
+                key=f"user_team_{doc_id}",
+            )
+            selected_team = selected_team_label if selected_role == "analista" and selected_team_label != no_team_label else ""
+            if selected_role == "analista" and not selected_team:
+                st.warning("Selecciona un equipo para que el analista pueda acceder a su espacio de trabajo.")
             if st.button("Guardar cambios", key=f"save_user_{doc_id}", type="primary"):
                 try:
                     _update_firestore_user(doc_id, email, selected_role, selected_team)
