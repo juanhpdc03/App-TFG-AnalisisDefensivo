@@ -3327,6 +3327,8 @@ def _normalize_user_role(role: str | None) -> str:
     clean_role = str(role or "invitado").strip().lower()
     if clean_role == "guest":
         return "invitado"
+    if clean_role in {"administracion", "administración", "administrator"}:
+        return "admin"
     return clean_role if clean_role in USER_ROLES else "invitado"
 
 
@@ -3436,7 +3438,8 @@ def _audit_action(action: str, detail: str = ""):
 def _current_user_label() -> tuple[str, str]:
     if st.session_state.get("logged_in"):
         profile = _current_user_profile()
-        role = _normalize_user_role(profile.get("rol")).capitalize()
+        role_key = _normalize_user_role(profile.get("rol"))
+        role = {"admin": "Admin", "analista": "Analista", "invitado": "Invitado"}.get(role_key, "Invitado")
         team = str(profile.get("equipo", "")).strip()
         label = role if not team else f"{role} | {team}"
         return str(st.session_state.get("login_user", "usuario")), label
@@ -5638,35 +5641,6 @@ def render_global_sidebar():
         """,
         unsafe_allow_html=True,
     )
-
-    if view == "analysis" and team and st.session_state.get("selected_match_id") is not None:
-        team_name = _team_display_name(team)
-        logo = _team_logo_html(team.get("team_id"), _initials(team_name), "sidebar-crest")
-        st.sidebar.markdown(
-            f"""
-            <div class="sidebar-club">
-                {logo}
-                <h2>{html.escape(team_name)}</h2>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        matches = _team_matches(int(team["team_id"]))
-        labels = _match_label_map(matches)
-        if labels:
-            current_match = int(st.session_state.get("selected_match_id"))
-            label_list = list(labels.keys())
-            current_label = next((label for label, mid in labels.items() if mid == current_match), label_list[0])
-            selected_label = st.sidebar.selectbox(
-                "Partido activo",
-                label_list,
-                index=label_list.index(current_label),
-                key=f"sidebar_match_{int(team['team_id'])}_{current_match}",
-            )
-            selected_match = labels[selected_label]
-            if selected_match != current_match:
-                st.session_state["selected_match_id"] = int(selected_match)
-                st.rerun()
 
     if _is_admin() and st.sidebar.button("Gestionar usuarios", use_container_width=True):
         _set_app_view("admin_users")
