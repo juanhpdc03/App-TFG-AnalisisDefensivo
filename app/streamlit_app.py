@@ -968,14 +968,13 @@ def inject_style():
         }
         .sidebar-club {
             text-align: center;
-            padding: 12px 6px 18px 6px;
-            border-bottom: 1px solid rgba(255,255,255,0.18);
-            margin-bottom: 12px;
+            padding: 8px 6px 10px 6px;
+            margin: 2px 0 8px 0;
         }
         .sidebar-crest {
-            width: 86px;
-            height: 86px;
-            margin: 0 auto 10px auto;
+            width: 82px;
+            height: 82px;
+            margin: 0 auto 8px auto;
             border-radius: 50%;
             background: #ffffff;
             color: var(--osasuna-red) !important;
@@ -998,12 +997,12 @@ def inject_style():
             display: block;
         }
         .sidebar-club h2 {
-            margin: 0;
-            font-size: 1.35rem;
+            margin: 0 0 4px 0;
+            font-size: 1.18rem;
             letter-spacing: 0;
         }
         .sidebar-club p {
-            margin: 4px 0 0 0;
+            margin: 0;
             color: #cdd7ea !important;
             font-size: 0.85rem;
         }
@@ -1019,7 +1018,7 @@ def inject_style():
             border: 1px solid rgba(255,255,255,0.10);
             border-radius: 8px;
             padding: 11px 12px;
-            margin: 10px 0 12px;
+            margin: 4px 0 10px;
         }
         .sidebar-account strong {
             display: block;
@@ -5640,26 +5639,7 @@ def render_global_sidebar():
         unsafe_allow_html=True,
     )
 
-    if _is_admin() and st.sidebar.button("Gestionar usuarios", use_container_width=True):
-        _set_app_view("admin_users")
-
-    if view == "admin_users":
-        if st.sidebar.button("Menu principal", use_container_width=True):
-            _set_app_view("portal")
-    elif view == "club":
-        if st.sidebar.button("Menú principal", use_container_width=True):
-            _set_app_view("portal")
-    elif view == "analysis":
-        if st.sidebar.button("Menú principal", use_container_width=True):
-            _set_app_view("portal")
-        if st.sidebar.button("Espacio del club", use_container_width=True):
-            _set_app_view("club", int(team["team_id"]))
-
-    if st.sidebar.button("Cerrar sesión", use_container_width=True):
-        _logout()
-
-    if view == "analysis" and st.session_state.get("selected_match_id") is not None:
-        st.sidebar.divider()
+    if view == "analysis" and team and st.session_state.get("selected_match_id") is not None:
         team_name = _team_display_name(team)
         logo = _team_logo_html(team.get("team_id"), _initials(team_name), "sidebar-crest")
         st.sidebar.markdown(
@@ -5667,7 +5647,6 @@ def render_global_sidebar():
             <div class="sidebar-club">
                 {logo}
                 <h2>{html.escape(team_name)}</h2>
-                <p>Análisis defensivo IDD/IPO</p>
             </div>
             """,
             unsafe_allow_html=True,
@@ -5688,6 +5667,25 @@ def render_global_sidebar():
             if selected_match != current_match:
                 st.session_state["selected_match_id"] = int(selected_match)
                 st.rerun()
+
+    if _is_admin() and st.sidebar.button("Gestionar usuarios", use_container_width=True):
+        _set_app_view("admin_users")
+
+    if view == "admin_users":
+        if st.sidebar.button("Menu principal", use_container_width=True):
+            _set_app_view("portal")
+    elif view == "club":
+        if st.sidebar.button("Menú principal", use_container_width=True):
+            _set_app_view("portal")
+    elif view == "analysis":
+        if st.sidebar.button("Menú principal", use_container_width=True):
+            _set_app_view("portal")
+        if st.sidebar.button("Espacio del club", use_container_width=True):
+            _set_app_view("club", int(team["team_id"]))
+
+    if st.sidebar.button("Cerrar sesión", use_container_width=True):
+        _logout()
+
 
 
 def _int_flag(value) -> int:
@@ -7277,7 +7275,6 @@ def sidebar_selector() -> int | None:
         <div class="sidebar-club">
             {sidebar_logo}
             <h2>{html.escape(default_team_name)}</h2>
-            <p>Análisis Defensivo IDD/IPO</p>
         </div>
         """,
         unsafe_allow_html=True,
