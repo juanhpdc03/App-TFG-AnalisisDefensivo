@@ -9176,7 +9176,7 @@ def render_informe(match_id: int, meta: dict):
 
     c1, c2, c3 = st.columns([1.2, 1, 1])
     with c1:
-        generate = st.button("Generar informe con Ollama", type="primary", use_container_width=True)
+        generate = st.button("Generar informe local", type="primary", use_container_width=True)
     with c2:
         reset = st.button("Usar informe local", use_container_width=True)
     with c3:
@@ -9190,7 +9190,7 @@ def render_informe(match_id: int, meta: dict):
     if generate:
         if not _ollama_api_key():
             st.warning("No hay clave de Ollama configurada. Se muestra el informe local.")
-        with st.spinner("Ollama esta redactando el informe tactico..."):
+        with st.spinner("Generando informe tactico local..."):
             report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=True)
             st.session_state[report_key] = report_text
             st.session_state[source_key] = source
@@ -9445,7 +9445,7 @@ def render_informe(match_id: int, meta: dict):
 
     c1, c2 = st.columns([1, 1])
     with c1:
-        generate = st.button("Generar informe con Ollama", type="primary", use_container_width=True)
+        generate = st.button("Generar informe local", type="primary", use_container_width=True)
     with c2:
         local = st.button("Actualizar informe local", use_container_width=True)
 
@@ -10481,7 +10481,7 @@ def render_informe(match_id: int, meta: dict):
 
     c1, c2 = st.columns([1, 1])
     with c1:
-        if st.button("Generar lectura con Ollama", type="primary", use_container_width=True):
+        if st.button("Generar lectura local", type="primary", use_container_width=True):
             with st.spinner("Generando lectura tactica..."):
                 st.session_state[report_key] = _coach_report_sections(payload)
                 st.session_state.pop(pdf_key, None)
@@ -10741,14 +10741,14 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
-        "Informe final con Ollama",
+        "Informe final local",
         "Genera un PDF profesional para entrenador con las conclusiones principales del analisis y solo con graficos ya presentes en la pagina web.",
     )
     pdf_key = f"ollama_only_report_pdf_{match_id}"
 
     if st.button("Generar informe", type="primary", use_container_width=True):
         st.session_state.pop(pdf_key, None)
-        with st.spinner("Ollama esta redactando y montando el informe..."):
+        with st.spinner("Generando y montando el informe local..."):
             try:
                 st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
             except Exception as exc:
@@ -10759,7 +10759,7 @@ def render_informe(match_id: int, meta: dict):
         st.download_button(
             "Descargar informe en PDF",
             data=st.session_state[pdf_key],
-            file_name=f"informe_ollama_{match_id}.pdf",
+            file_name=f"informe_tactico_{match_id}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -10953,11 +10953,11 @@ def _elite_fig_path(match_id: int, figures: dict, *keys: str, fallback: str) -> 
 
 
 def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
-    """Build a fixed-layout coach dossier with Ollama text and web-app figures only."""
+    """Build a fixed-layout coach dossier from deterministic local report content."""
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
         raise RuntimeError(payload["error"])
-    analysis = _coach_report_sections(payload)
+    analysis = _coach_report_fallback(payload)
 
     _, clusters, _, _ = _prepare_app_data(match_id, meta)
     clusters_display = _clusters_for_display(clusters)
@@ -11135,32 +11135,211 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     return buffer.getvalue()
 
 
+def _local_report_typology(payload: dict) -> dict:
+    tipologias = payload.get("tipologias", [])
+    return max(
+        tipologias,
+        key=lambda item: (
+            float(item.get("ipar_medio") or 0),
+            float(item.get("ddi_medio") or 0),
+            int(item.get("secuencias") or 0),
+        ),
+        default={},
+    )
+
+
+def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[str, str]) -> bytes:
+    metrics = payload.get("metricas_globales", {})
+    executive = payload.get("resumen_ejecutivo", {})
+    critical_typology = _local_report_typology(payload)
+    critical_sequences = _report_records_df(payload, "secuencias_criticas")
+    top_idd = _report_records_df(payload, "secuencias_top_idd")
+    causes = pd.DataFrame(payload.get("causas_defensivas", []))
+    ctx = _match_report_context(match_id, meta)
+    teams = _presentation_teams(match_id, meta)
+    score = _score_text(meta.get("resultado")) or _score_text(meta.get("score")) or _infer_score(
+        match_id, teams["home_id"], teams["away_id"]
+    )
+    buffer = io.BytesIO()
+    total_pages = 5
+
+    with PdfPages(buffer) as pdf:
+        fig, ax = _elite_pdf_page(f"Informe tactico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
+        ax.text(0.07, 0.77, f"{teams['home_name']}  {score}  {teams['away_name']}", transform=ax.transAxes, fontsize=16, weight="bold", color=PDF_INK)
+        kpis = [
+            ("Secuencias", metrics.get("secuencias_rivales")),
+            ("Tiros / puerta", f"{metrics.get('tiros', '-')} / {metrics.get('tiros_puerta', '-')}"),
+            ("IDD medio", metrics.get("ddi_medio")),
+            ("IPO medio", metrics.get("ipar_medio")),
+            ("Alta amenaza", metrics.get("secuencias_alta_amenaza")),
+            ("Zona dañada", metrics.get("zona_mas_danada")),
+        ]
+        for idx, (label, value) in enumerate(kpis):
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.58 - (idx // 3) * 0.115, 0.26, 0.085, label, value)
+        _elite_pdf_text_panel(ax, 0.07, 0.14, 0.86, 0.24, "Resumen ejecutivo", analysis["resumen_ejecutivo"], max_lines=8)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Tipologia mas dañina", "Patron rival con mayor IPO medio", 2, total_pages)
+        typo_cards = [
+            ("Tipologia", critical_typology.get("tipologia", "-")),
+            ("Secuencias", critical_typology.get("secuencias", "-")),
+            ("IDD medio", critical_typology.get("ddi_medio", "-")),
+            ("IPO medio", critical_typology.get("ipar_medio", "-")),
+            ("Tiros", critical_typology.get("tiros", "-")),
+            ("Tiros puerta", critical_typology.get("tiros_puerta", "-")),
+        ]
+        for idx, (label, value) in enumerate(typo_cards):
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.66 - (idx // 3) * 0.11, 0.26, 0.082, label, value)
+        _elite_pdf_table(
+            ax,
+            pd.DataFrame(payload.get("tipologias", [])),
+            ["tipologia", "secuencias", "ddi_medio", "ipar_medio", "tiros", "tiros_puerta"],
+            ["Tipologia", "N", "IDD", "IPO", "Tiros", "A puerta"],
+            [0.07, 0.33, 0.86, 0.16],
+            max_rows=5,
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.12, 0.86, 0.16, "Lectura", analysis["tipologia_destacada"], max_lines=5)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Estructura defensiva", "Situacion asociada a la secuencia prioritaria", 3, total_pages)
+        top_seq = payload.get("secuencias_criticas", [{}])[0] if payload.get("secuencias_criticas") else {}
+        structure_cards = [
+            ("Secuencia", top_seq.get("secuencia_rival_id", "-")),
+            ("Minuto", top_seq.get("minuto_partido", "-")),
+            ("Tipologia", top_seq.get("tipologia", "-")),
+            ("IDD", top_seq.get("indice_desorganizacion", "-")),
+            ("IPO", top_seq.get("indice_peligrosidad_accion", "-")),
+            ("Causa", top_seq.get("causa_tactica", "-")),
+        ]
+        for idx, (label, value) in enumerate(structure_cards):
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.66 - (idx // 3) * 0.11, 0.26, 0.082, label, value)
+        _elite_pdf_table(ax, causes, ["causa", "secuencias"], ["Causa", "Secuencias"], [0.07, 0.36, 0.40, 0.13], max_rows=5)
+        _elite_pdf_table(
+            ax,
+            top_idd,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_desorganizacion", "indice_peligrosidad_accion"],
+            ["ID", "Min", "Tipologia", "IDD", "IPO"],
+            [0.53, 0.36, 0.40, 0.13],
+            max_rows=5,
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.12, 0.86, 0.17, "Diagnostico", analysis["estructura_defensiva"], max_lines=6)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Secuencias criticas", "Acciones que conviene revisar primero", 4, total_pages)
+        _elite_pdf_table(
+            ax,
+            critical_sequences,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max"],
+            ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT"],
+            [0.07, 0.48, 0.86, 0.28],
+            max_rows=6,
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.17, 0.86, 0.23, "Lectura de acciones prioritarias", analysis["secuencias_criticas"], max_lines=8)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Recomendaciones tacticas", "Puntos de mejora para el cuerpo tecnico", 5, total_pages)
+        _elite_pdf_text_panel(ax, 0.07, 0.58, 0.40, 0.20, "Ajuste sobre tipologia", analysis["tipologia_destacada"], max_lines=6)
+        _elite_pdf_text_panel(ax, 0.53, 0.58, 0.40, 0.20, "Ajuste estructural", analysis["estructura_defensiva"], max_lines=6)
+        _elite_pdf_text_panel(ax, 0.07, 0.32, 0.40, 0.18, "Revision de video", analysis["secuencias_criticas"], max_lines=5)
+        _elite_pdf_text_panel(ax, 0.53, 0.32, 0.40, 0.18, "Plan de mejora", analysis["recomendaciones_globales"], max_lines=5)
+        _elite_pdf_text_panel(ax, 0.07, 0.10, 0.86, 0.15, "Sintesis", analysis["recomendaciones_globales"], max_lines=4)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+    buffer.seek(0)
+    return buffer.getvalue()
+
+
+def _report_metric_grid(metrics: dict, executive: dict):
+    items = [
+        ("Secuencias rivales", metrics.get("secuencias_rivales", "-")),
+        ("Tiros / puerta", f"{metrics.get('tiros', '-')} / {metrics.get('tiros_puerta', '-')}"),
+        ("IDD medio", metrics.get("ddi_medio", "-")),
+        ("IPO medio", metrics.get("ipar_medio", "-")),
+        ("Alta amenaza", metrics.get("secuencias_alta_amenaza", "-")),
+        ("Secuencia prioritaria", executive.get("secuencia_prioritaria", "-")),
+    ]
+    cols = st.columns(3)
+    for idx, (label, value) in enumerate(items):
+        with cols[idx % 3]:
+            st.metric(label, value)
+
+
 def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
-        "Informe final con Ollama",
-        "Genera un PDF profesional para entrenador con conclusiones principales, KPIs, graficos ya presentes en la pagina web y recomendaciones tacticas.",
+        "Informe local del partido",
+        "Lectura determinista en la propia pagina: KPIs, tipologia mas dañina, estructura defensiva, secuencias criticas y recomendaciones tacticas.",
     )
-    pdf_key = f"ollama_report_pdf_{match_id}"
+    payload = _report_payload(match_id, meta)
+    if payload.get("error"):
+        st.warning(payload["error"])
+        return
 
-    if st.button("Generar informe", type="primary", use_container_width=True):
-        st.session_state.pop(pdf_key, None)
-        with st.spinner("Ollama esta redactando y montando el informe..."):
-            try:
-                st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
-            except Exception as exc:
-                st.error(f"No se pudo generar el informe con Ollama: {exc}")
+    analysis = _coach_report_fallback(payload)
+    metrics = payload.get("metricas_globales", {})
+    executive = payload.get("resumen_ejecutivo", {})
+    critical_typology = _local_report_typology(payload)
+    critical_sequences = _report_records_df(payload, "secuencias_criticas")
+    top_seq = payload.get("secuencias_criticas", [{}])[0] if payload.get("secuencias_criticas") else {}
 
-    if pdf_key in st.session_state:
-        st.success("Informe generado correctamente.")
-        st.download_button(
-            "Descargar informe en PDF",
-            data=st.session_state[pdf_key],
-            file_name=f"informe_ollama_{match_id}.pdf",
-            mime="application/pdf",
-            type="primary",
+    _subsection_heading("1. KPIs principales")
+    _report_metric_grid(metrics, executive)
+    st.markdown(analysis["resumen_ejecutivo"])
+
+    _subsection_heading("2. Tipologia mas dañina")
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Tipologia", critical_typology.get("tipologia", "-"))
+    c2.metric("IPO medio", critical_typology.get("ipar_medio", "-"))
+    c3.metric("IDD medio", critical_typology.get("ddi_medio", "-"))
+    typo_df = pd.DataFrame(payload.get("tipologias", []))
+    if not typo_df.empty:
+        typo_cols = ["tipologia", "secuencias", "ddi_medio", "ipar_medio", "tiros", "tiros_puerta"]
+        st.dataframe(
+            typo_df[[col for col in typo_cols if col in typo_df.columns]].head(6),
             use_container_width=True,
+            hide_index=True,
         )
+    st.markdown(analysis["tipologia_destacada"])
+
+    _subsection_heading("3. Estructura defensiva asociada")
+    cols = st.columns(3)
+    cols[0].metric("Secuencia", top_seq.get("secuencia_rival_id", "-"))
+    cols[1].metric("Minuto", top_seq.get("minuto_partido", "-"))
+    cols[2].metric("Causa principal", top_seq.get("causa_tactica", "-"))
+    st.markdown(analysis["estructura_defensiva"])
+
+    _subsection_heading("4. Secuencias mas criticas")
+    if not critical_sequences.empty:
+        table_cols = [
+            "secuencia_rival_id",
+            "minuto_partido",
+            "tipologia",
+            "score_critico",
+            "indice_desorganizacion",
+            "indice_peligrosidad_accion",
+            "xT_max",
+            "causa_tactica",
+        ]
+        st.dataframe(critical_sequences[[c for c in table_cols if c in critical_sequences.columns]].head(8), use_container_width=True, hide_index=True)
+    st.markdown(analysis["secuencias_criticas"])
+
+    _subsection_heading("5. Recomendaciones tacticas")
+    st.markdown(analysis["recomendaciones_globales"])
+
+    pdf_bytes = _local_report_pdf(match_id, meta, payload, analysis)
+    st.download_button(
+        "Exportar este informe a PDF",
+        data=pdf_bytes,
+        file_name=f"informe_tactico_{match_id}.pdf",
+        mime="application/pdf",
+        type="primary",
+        use_container_width=True,
+    )
 
 
 def main():
