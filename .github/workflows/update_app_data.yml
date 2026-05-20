@@ -3,8 +3,10 @@ name: Actualizar analisis BePro
 on:
   workflow_dispatch:
   schedule:
-    - cron: "17 7 * * 1"
-      timezone: "Europe/Madrid"
+    # GitHub Actions usa UTC. Estos dos disparos cubren CET/CEST y
+    # el primer paso solo deja continuar si en Madrid son las 07:00 del martes.
+    - cron: "0 5 * * 2"
+    - cron: "0 6 * * 2"
 
 permissions:
   contents: write
@@ -19,21 +21,43 @@ jobs:
     timeout-minutes: 360
 
     steps:
+      - name: Validar horario de Madrid
+        id: schedule_gate
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          MADRID_DAY="$(TZ=Europe/Madrid date +%u)"
+          MADRID_HOUR="$(TZ=Europe/Madrid date +%H)"
+
+          if [ "$MADRID_DAY" = "2" ] && [ "$MADRID_HOUR" = "07" ]; then
+            echo "should_run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            echo "Ejecucion omitida: en Madrid no son las 07:00 del martes."
+          fi
+
       - name: Descargar repositorio
+        if: steps.schedule_gate.outputs.should_run == 'true'
         uses: actions/checkout@v4
 
       - name: Preparar Python
+        if: steps.schedule_gate.outputs.should_run == 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           cache: "pip"
 
       - name: Instalar dependencias
+        if: steps.schedule_gate.outputs.should_run == 'true'
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Sincronizar BePro y regenerar app
+        if: steps.schedule_gate.outputs.should_run == 'true'
         env:
           BEPRO_API_KEY: ${{ secrets.BEPRO_API_KEY }}
           BEPRO_DATA_TOKEN: ${{ secrets.BEPRO_DATA_TOKEN }}
@@ -45,6 +69,7 @@ jobs:
           python scripts/auto_update_bepro.py --team-id "$TEAM_ID"
 
       - name: Guardar resultados generados
+        if: steps.schedule_gate.outputs.should_run == 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

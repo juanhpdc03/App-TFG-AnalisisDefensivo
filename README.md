@@ -92,7 +92,7 @@ BEPRO_SEASON_IDS    ID o IDs usados para listar partidos en BePro, separados por
 
 El workflow esta en `.github/workflows/update_app_data.yml`.
 
-Por defecto se ejecuta cada lunes a las 07:17 en horario de Madrid y tambien se puede lanzar manualmente desde la pestana
+Por defecto se ejecuta cada martes a las 07:00 en horario de Madrid y tambien se puede lanzar manualmente desde la pestana
 `Comportamiento` / `Actions` de GitHub.
 
 Antes de activarlo en GitHub:
