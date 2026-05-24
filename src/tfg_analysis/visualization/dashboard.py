@@ -382,9 +382,15 @@ def plot_evolucion_temporal_con_tiros(df_def_dinamico: pd.DataFrame, secuencias:
         _draw_ball_events(df[shot_mask].copy(), "#2ea05a", 135, 0.018)
         _draw_ball_events(df[shot_on_target_mask].copy(), "#f2c94c", 160, 0.030)
         _draw_ball_events(df[goal_mask].copy(), "#c8102e", 190, 0.042)
-    ax.text(1, MOMENTUM_ALERT_THRESHOLD / 2, "CONTROLADO", color="#8ee1ad", fontsize=10, weight="bold", va="center")
-    ax.text(1, (MOMENTUM_ALERT_THRESHOLD + MOMENTUM_STRESS_THRESHOLD) / 2, "ALERTA", color="#f2c94c", fontsize=10, weight="bold", va="center")
-    ax.text(1, min(ymax - 0.02, MOMENTUM_STRESS_THRESHOLD + 0.04), "ESTRES ALTO", color="#ff8a9b", fontsize=10, weight="bold", va="center")
+    label_box = {
+        "boxstyle": "round,pad=0.28",
+        "facecolor": "#1b2433",
+        "edgecolor": "none",
+        "alpha": 0.72,
+    }
+    ax.text(1.3, MOMENTUM_ALERT_THRESHOLD * 0.34, "CONTROLADO", color="#8ee1ad", fontsize=11, weight="black", va="center", bbox=label_box)
+    ax.text(1.3, (MOMENTUM_ALERT_THRESHOLD + MOMENTUM_STRESS_THRESHOLD) / 2, "ALERTA", color="#f2c94c", fontsize=11, weight="black", va="center", bbox=label_box)
+    ax.text(1.3, min(ymax - 0.035, max(MOMENTUM_STRESS_THRESHOLD + 0.075, ymax * 0.82)), "ESTRES ALTO", color="#ff8a9b", fontsize=11, weight="black", va="center", bbox=label_box)
     ax.axvline(45, color="white", linestyle=":", lw=1.2, alpha=0.45)
     ax.text(46, ymax * 0.95, "Descanso", color="#d8deea", fontsize=9)
     ax.set_xlim(0, int(timeline["minuto"].max()))
