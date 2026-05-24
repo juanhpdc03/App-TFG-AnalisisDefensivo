@@ -3,9 +3,9 @@ Secuencias rivales,45
 Tiros Bepro rival,10
 Tiros en secuencias,6
 Tiros a puerta rival,6
-DDI medio,0.39802003654312595
-IPAR medio,0.35048998036437656
-Cluster mas repetido,C3.0
+IDD medio,0.39802003654312595
+IPO medio,0.35048998036437656
+Cluster mas repetido,C1.0
 Zona/carril mas danino,carril_central
 Foco defensivo,estructura_anchura
-Cluster prioritario,C0.0
+Cluster prioritario,C3.0

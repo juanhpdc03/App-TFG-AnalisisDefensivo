@@ -5367,7 +5367,7 @@ MOMENTUM_INFO = (
     "Construccion del momentum defensivo: acumula la presion rival minuto a minuto.\n"
     "40% IDD: Indice de Desorganizacion Defensiva. Aporta el peso de la deformacion del bloque.\n"
     "60% IPO: Indice de Peligrosidad Ofensiva Rival. Tiene mayor peso porque el modelo mide presion acumulada rival.\n"
-    "EWMA: M(t)=0.88*M(t-1)+0.12*(0.40*IDD+0.60*IPO).\n"
+    "EWMA: M(t)=0.80*M(t-1)+0.20*(0.40*IDD+0.60*IPO).\n"
     "Memoria 88%: la curva conserva parte del valor anterior para que varias acciones seguidas mantengan la presion.\n"
     "Uso: primero mira la curva, despues revisa las alertas y las secuencias del tramo critico."
 )
@@ -7642,7 +7642,7 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         )
 
 
-MOMENTUM_ALPHA = 0.88
+MOMENTUM_ALPHA = 0.80
 MOMENTUM_IDD_WEIGHT = 0.40
 MOMENTUM_IPO_WEIGHT = 0.60
 MOMENTUM_ALERT_THRESHOLD = 0.20
@@ -8079,10 +8079,10 @@ def _render_momentum_formula_note():
           <div class="momentum-formula-grid">
             <div><b>IDD</b><em>40%</em><span>Cuanto mas se rompe la estructura, mas sube la curva.</span></div>
             <div><b>IPO</b><em>60%</em><span>Prioriza el agobio rival y el peligro ofensivo generado.</span></div>
-            <div><b>alpha</b><em>0.88</em><span>Conserva memoria temporal de la presion anterior.</span></div>
+            <div><b>alpha</b><em>0.80</em><span>Conserva memoria temporal de la presion anterior.</span></div>
             <div><b>EWMA</b><em>12%</em><span>Integra la nueva senal sin que una accion aislada distorsione la lectura.</span></div>
           </div>
-          <span>La curva se actualiza como M(t)=0.88*M(t-1)+0.12*(0.40*IDD+0.60*IPO). Por eso una accion aislada genera un pico contenido, mientras que varias llegadas seguidas sostienen el momentum rival.</span>
+          <span>La curva se actualiza como M(t)=0.80*M(t-1)+0.20*(0.40*IDD+0.60*IPO). Por eso una accion aislada genera un pico contenido, mientras que varias llegadas seguidas sostienen el momentum rival.</span>
           <span>Las alertas temporales se calculan sobre la curva acumulada en tramos de 15 minutos, priorizando los intervalos donde la presion se mantiene mas alta.</span>
         </div>
         """,

@@ -8,8 +8,8 @@ El **IDD medio** del partido es **0.40** y el **IPO medio** es **0.35**. La caus
 
 ## Patron prioritario
 
-El cluster de mayor prioridad analitica es el **cluster 0.0**, con **15.0 secuencias**, IDD medio **0.47** e IPO medio **0.45**.
+El cluster de mayor prioridad analitica es el **cluster 3.0**, con **15.0 secuencias**, IDD medio **0.47** e IPO medio **0.45**.
 
 ## Interpretacion
 
-El foco del informe no es explicar todos los tiros aislados del rival, sino los tiros y acciones peligrosas que aparecen dentro de las secuencias ofensivas detectadas por la metodologia. Esto permite estudiar patrones comparables de desorganizacion defensiva y relacionarlos con la peligrosidad real de la accion.
+El foco del informe no es explicar todos los tiros aislados del rival, sino los tiros y acciones peligrosas que aparecen dentro de las secuencias ofensivas detectadas por la metodología. Esto permite estudiar patrones comparables de desorganización defensiva y relacionarlos con la peligrosidad real de la acción.
