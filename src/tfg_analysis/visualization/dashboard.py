@@ -340,11 +340,11 @@ def plot_evolucion_temporal_con_tiros(df_def_dinamico: pd.DataFrame, secuencias:
             official = events.get("match_time_tiro_oficial", pd.Series(np.nan, index=events.index))
             return np.where(official.notna(), official / 60000, events["minuto_partido"])
 
-        def _draw_ball_events(events: pd.DataFrame, ring_color: str, size: int, y_offset: float):
+        def _draw_ball_events(events: pd.DataFrame, ring_color: str, size: int):
             if events.empty:
                 return
             minutes = _event_minutes(events)
-            y_vals = np.interp(minutes, timeline["minuto"], timeline["momentum"]) + y_offset
+            y_vals = np.interp(minutes, timeline["minuto"], timeline["momentum"])
             ax.scatter(
                 minutes,
                 y_vals,
@@ -379,9 +379,9 @@ def plot_evolucion_temporal_con_tiros(df_def_dinamico: pd.DataFrame, secuencias:
         goal_mask = _event_flag("es_gol")
         shot_on_target_mask = _event_flag("tipo_finalizacion_tiro_puerta") & ~goal_mask
         shot_mask = _event_flag("tipo_finalizacion_tiro") & ~shot_on_target_mask & ~goal_mask
-        _draw_ball_events(df[shot_mask].copy(), "#2ea05a", 135, 0.018)
-        _draw_ball_events(df[shot_on_target_mask].copy(), "#f2c94c", 160, 0.030)
-        _draw_ball_events(df[goal_mask].copy(), "#c8102e", 190, 0.042)
+        _draw_ball_events(df[shot_mask].copy(), "#2ea05a", 135)
+        _draw_ball_events(df[shot_on_target_mask].copy(), "#f2c94c", 160)
+        _draw_ball_events(df[goal_mask].copy(), "#c8102e", 190)
     label_box = {
         "boxstyle": "round,pad=0.28",
         "facecolor": "#1b2433",
