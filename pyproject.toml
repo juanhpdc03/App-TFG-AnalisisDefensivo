@@ -7,6 +7,8 @@ dependencies = [
     "numpy",
     "pandas",
     "requests",
+    "pyrebase4",
+    "google-cloud-firestore",
     "scikit-learn",
     "matplotlib",
     "seaborn",
