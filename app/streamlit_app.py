@@ -4599,10 +4599,12 @@ def _plot_trajectory_fields(match_id: int, meta: dict, seq: pd.DataFrame, height
         )
         fig.update_xaxes(range=[0, FIELD_WIDTH_M], visible=False, row=1, col=idx)
         fig.update_yaxes(range=[0, FIELD_LENGTH_M], visible=False, scaleanchor=f"x{idx}" if idx > 1 else "x", scaleratio=1, row=1, col=idx)
-    fig.update_layout(height=height, plot_bgcolor="#5f7668", paper_bgcolor="#202633", margin=dict(l=5, r=5, t=48, b=8))
+    if ncols == 1:
+        fig.update_layout(width=560)
+    fig.update_layout(height=height, plot_bgcolor="#202633", paper_bgcolor="#202633", margin=dict(l=12, r=12, t=48, b=8))
     for ann in fig.layout.annotations:
         ann.font = dict(color="#e8edf7", size=13)
-    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig, use_container_width=ncols > 1, config=PLOTLY_CONFIG)
     return True
 
 
@@ -4645,10 +4647,12 @@ def _plot_density_fields(match_id: int, meta: dict, seq: pd.DataFrame, height: i
         )
         fig.update_xaxes(range=[0, FIELD_WIDTH_M], visible=False, row=1, col=idx)
         fig.update_yaxes(range=[0, FIELD_LENGTH_M], visible=False, scaleanchor=f"x{idx}" if idx > 1 else "x", scaleratio=1, row=1, col=idx)
-    fig.update_layout(height=height, plot_bgcolor="#5f7668", paper_bgcolor="#202633", margin=dict(l=5, r=5, t=48, b=8))
+    if ncols == 1:
+        fig.update_layout(width=620)
+    fig.update_layout(height=height, plot_bgcolor="#202633", paper_bgcolor="#202633", margin=dict(l=12, r=12, t=48, b=8))
     for ann in fig.layout.annotations:
         ann.font = dict(color="#e8edf7", size=13)
-    st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
+    st.plotly_chart(fig, use_container_width=ncols > 1, config=PLOTLY_CONFIG)
     return True
 
 
@@ -7911,6 +7915,67 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
     )
     st.markdown(
         f"""
+        <style>
+          .chrono-critical-card {{
+            border: 1px solid rgba(255,255,255,.16);
+            border-left: 7px solid #c8102e;
+            border-top: 3px solid #ff405c;
+            background: linear-gradient(135deg, rgba(48,56,74,.98), rgba(86,20,39,.92));
+            border-radius: 8px;
+            padding: 18px 20px 16px;
+            box-shadow: 0 18px 42px rgba(0,0,0,.24), 0 0 24px rgba(200,16,46,.16);
+            margin: 8px 0 20px;
+          }}
+          .chrono-critical-kicker {{
+            color: #ffb3bf;
+            font-size: .78rem;
+            font-weight: 900;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+          }}
+          .chrono-critical-title {{
+            color: #fff;
+            font-size: 2.3rem;
+            font-weight: 950;
+            line-height: 1;
+            margin: 4px 0 14px;
+          }}
+          .chrono-critical-grid {{
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 12px;
+          }}
+          .chrono-critical-grid div {{
+            background: rgba(10,16,32,.34);
+            border: 1px solid rgba(255,255,255,.11);
+            border-radius: 8px;
+            padding: 10px;
+            min-height: 74px;
+          }}
+          .chrono-critical-grid span {{
+            display: block;
+            color: #fff;
+            font-size: 1.22rem;
+            font-weight: 950;
+            line-height: 1.08;
+          }}
+          .chrono-critical-grid .metric-badge {{ font-size: .82rem; }}
+          .chrono-critical-grid .metric-number {{ font-size: .80em; }}
+          .chrono-critical-grid small {{
+            display: block;
+            color: #cbd4e6;
+            font-size: .76rem;
+            margin-top: 6px;
+            line-height: 1.15;
+          }}
+          .chrono-critical-card p {{
+            color: #e7edf8;
+            margin: 0;
+            font-size: .98rem;
+            line-height: 1.45;
+          }}
+        </style>
         <div class="chrono-critical-card">
           <div class="chrono-critical-kicker">TRAMO CRÍTICO DETECTADO</div>
           <div class="chrono-critical-title">{html.escape(tramo)}'</div>
@@ -11249,10 +11314,8 @@ def _report_metric_grid(metrics: dict, executive: dict):
         ("Tiros a puerta", metrics.get("tiros_puerta", "-")),
         ("Goles", metrics.get("goles", "-")),
     ]
-    cols = st.columns(4)
-    for idx, (label, value) in enumerate(items):
-        with cols[idx % 4]:
-            st.metric(label, value)
+    cards = "".join(_summary_card_html(label, value) for label, value in items)
+    st.markdown(f'<div class="summary-card-grid" style="--summary-cols:4;">{cards}</div>', unsafe_allow_html=True)
 
 
 def _critical_typology_context(seq: pd.DataFrame, clusters: pd.DataFrame, critical_typology: dict) -> dict:
@@ -11276,6 +11339,11 @@ def _critical_typology_context(seq: pd.DataFrame, clusters: pd.DataFrame, critic
         "zona": _zone_label(cluster_row.get("zona_dominante", "")) if not cluster_row.empty else "-",
         "carril": _lane_label(cluster_row.get("carril_dominante", "")) if not cluster_row.empty else "-",
     }
+
+
+def _report_card_grid(items: list[tuple[str, object]], cols: int = 4):
+    cards = "".join(_summary_card_html(label, value) for label, value in items)
+    st.markdown(f'<div class="summary-card-grid" style="--summary-cols:{int(cols)};">{cards}</div>', unsafe_allow_html=True)
 
 
 def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[str, str]) -> bytes:
@@ -11478,11 +11546,15 @@ def render_informe(match_id: int, meta: dict):
     )
 
     _subsection_heading("2. Tipologia mas danina")
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Tipologia", critical_typology.get("tipologia", "-"))
-    c2.metric("IPO medio", critical_typology.get("ipar_medio", "-"))
-    c3.metric("Causa principal", typology_ctx["causa"])
-    c4.metric("Zona / carril", f"{typology_ctx['zona']} · {typology_ctx['carril']}")
+    _report_card_grid(
+        [
+            ("Tipologia", critical_typology.get("tipologia", "-")),
+            ("IPO medio", critical_typology.get("ipar_medio", "-")),
+            ("Causa principal", typology_ctx["causa"]),
+            ("Zona / carril", f"{typology_ctx['zona']} · {typology_ctx['carril']}"),
+        ],
+        cols=4,
+    )
     if not typology_ctx["seq"].empty:
         _plot_trajectory_fields(match_id, meta, typology_ctx["seq"], height=420)
         _plot_density_fields(match_id, meta, typology_ctx["seq"], height=420)
@@ -11493,11 +11565,15 @@ def render_informe(match_id: int, meta: dict):
     )
 
     _subsection_heading("3. Estructura defensiva asociada")
-    cols = st.columns(4)
-    cols[0].metric("IDD medio", critical_typology.get("ddi_medio", "-"))
-    cols[1].metric("IPO medio", critical_typology.get("ipar_medio", "-"))
-    cols[2].metric("xT maximo", critical_typology.get("xt_max", "-"))
-    cols[3].metric("Pitch control rival", critical_typology.get("pc_rival_medio", "-"))
+    _report_card_grid(
+        [
+            ("IDD medio", critical_typology.get("ddi_medio", "-")),
+            ("IPO medio", critical_typology.get("ipar_medio", "-")),
+            ("xT maximo", critical_typology.get("xt_max", "-")),
+            ("Pitch control rival", critical_typology.get("pc_rival_medio", "-")),
+        ],
+        cols=4,
+    )
     st.markdown(analysis["estructura_defensiva"])
 
     _subsection_heading("4. Secuencias mas criticas")
