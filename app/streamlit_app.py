@@ -4538,6 +4538,9 @@ def _path_table_for_plot(match_id: int, meta: dict, seq: pd.DataFrame) -> pd.Dat
     cols = ["secuencia_rival_id", "tipologia", "patron_tactico", "tipologia_id"]
     if not seq.empty and "secuencia_rival_id" in seq.columns:
         lookup = seq[[c for c in cols if c in seq.columns]].drop_duplicates("secuencia_rival_id")
+        valid_ids = set(pd.to_numeric(lookup["secuencia_rival_id"], errors="coerce").dropna().astype(int))
+        if valid_ids:
+            path_df = path_df[pd.to_numeric(path_df["secuencia_rival_id"], errors="coerce").isin(valid_ids)].copy()
         path_df = path_df.merge(lookup, on="secuencia_rival_id", how="left")
     if "patron_tactico" not in path_df.columns:
         path_df["patron_tactico"] = path_df.get("tipologia", path_df.get("cluster_trayectoria", "-")).astype(str)
@@ -6005,6 +6008,17 @@ def _sequence_minimap_payload(match_id: int, row: pd.Series) -> dict:
     }
 
 
+def _sequence_xt_values_from_video(match_id: int, row: pd.Series) -> tuple[object, object]:
+    """Use the same xThreat path shown in the video minimap for sequence cards."""
+    payload = _sequence_minimap_payload(match_id, row)
+    points = payload.get("points", []) if payload else []
+    xt_values = [pd.to_numeric(point.get("xT"), errors="coerce") for point in points]
+    xt_values = [float(value) for value in xt_values if pd.notna(value)]
+    if not xt_values:
+        return row.get("xT_max"), row.get("xT_added")
+    return max(xt_values), xt_values[-1] - xt_values[0]
+
+
 def _bepro_credentials() -> tuple[str | None, str | None]:
     email = (
         os.getenv("BEPRO_EMAIL", "").strip()
@@ -6709,6 +6723,8 @@ def _render_sequence_player(match_id: int, row: pd.Series):
 def _sequence_display_table(df: pd.DataFrame, n: int = 12) -> pd.DataFrame:
     source = df.copy()
     if not source.empty:
+        if "tipologia_id" not in source.columns and "tipologia" in source.columns:
+            source["tipologia_id"] = source["tipologia"]
         source["tiro/a puerta/gol"] = (
             source.get("tipo_finalizacion_tiro", pd.Series(0, index=source.index)).map(_int_flag).astype(str)
             + " / "
@@ -7593,6 +7609,7 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         f"puerta {_si_no(row.get('tipo_finalizacion_tiro_puerta'))}, "
         f"gol {_si_no(row.get('es_gol'))}"
     )
+    xt_video_max, xt_video_added = _sequence_xt_values_from_video(match_id, row)
     url_info = _video_url(match_id, row)
     st.markdown(
         f"""
@@ -7601,8 +7618,8 @@ def render_secuencias_criticas(match_id: int, meta: dict):
             <div class="sequence-kpi-row">
                 <div class="sequence-kpi"><span>IDD</span><strong>{_index_badge_html('indice_desorganizacion', row.get('indice_desorganizacion'), compact=True)}</strong></div>
                 <div class="sequence-kpi"><span>IPO</span><strong>{_index_badge_html('indice_peligrosidad_accion', row.get('indice_peligrosidad_accion'), compact=True)}</strong></div>
-                <div class="sequence-kpi"><span>xT max</span><strong>{_format_metric(row.get('xT_max'))}</strong></div>
-                <div class="sequence-kpi"><span>Incremento xT</span><strong>{_format_metric(row.get('xT_added'))}</strong></div>
+                <div class="sequence-kpi"><span>xT max</span><strong>{_format_metric(xt_video_max)}</strong></div>
+                <div class="sequence-kpi"><span>Incremento xT</span><strong>{_format_metric(xt_video_added)}</strong></div>
             </div>
             <div class="sequence-read-box"><strong>Lectura táctica:</strong> {narrative_txt}</div>
             <div class="sequence-tag-grid">
@@ -11228,16 +11245,136 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
 def _report_metric_grid(metrics: dict, executive: dict):
     items = [
         ("Secuencias rivales", metrics.get("secuencias_rivales", "-")),
-        ("Tiros / puerta", f"{metrics.get('tiros', '-')} / {metrics.get('tiros_puerta', '-')}"),
-        ("IDD medio", metrics.get("ddi_medio", "-")),
-        ("IPO medio", metrics.get("ipar_medio", "-")),
-        ("Alta amenaza", metrics.get("secuencias_alta_amenaza", "-")),
-        ("Secuencia prioritaria", executive.get("secuencia_prioritaria", "-")),
+        ("Tiros", metrics.get("tiros", "-")),
+        ("Tiros a puerta", metrics.get("tiros_puerta", "-")),
+        ("Goles", metrics.get("goles", "-")),
     ]
-    cols = st.columns(3)
+    cols = st.columns(4)
     for idx, (label, value) in enumerate(items):
-        with cols[idx % 3]:
+        with cols[idx % 4]:
             st.metric(label, value)
+
+
+def _critical_typology_context(seq: pd.DataFrame, clusters: pd.DataFrame, critical_typology: dict) -> dict:
+    tipologia = str(critical_typology.get("tipologia", "-"))
+    selected = seq[seq.get("tipologia", pd.Series(dtype=str)).astype(str).eq(tipologia)].copy() if not seq.empty else pd.DataFrame()
+    cluster_row = pd.Series(dtype=object)
+    if not clusters.empty:
+        mask = pd.Series(False, index=clusters.index)
+        for col in ["patron_tactico", "tipologia"]:
+            if col in clusters.columns:
+                mask = mask | clusters[col].astype(str).eq(tipologia)
+        if mask.any():
+            cluster_row = clusters[mask].iloc[0]
+    cause = "-"
+    if not selected.empty and "causa_tactica" in selected.columns:
+        mode = selected["causa_tactica"].dropna().astype(str).mode()
+        cause = mode.iloc[0] if not mode.empty else "-"
+    return {
+        "seq": selected,
+        "causa": cause,
+        "zona": _zone_label(cluster_row.get("zona_dominante", "")) if not cluster_row.empty else "-",
+        "carril": _lane_label(cluster_row.get("carril_dominante", "")) if not cluster_row.empty else "-",
+    }
+
+
+def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[str, str]) -> bytes:
+    metrics = payload.get("metricas_globales", {})
+    critical_typology = _local_report_typology(payload)
+    critical_sequences = _report_records_df(payload, "secuencias_criticas")
+    seq, clusters, _, _ = _prepare_app_data(match_id, meta)
+    typology_ctx = _critical_typology_context(seq, clusters, critical_typology)
+    ctx = _match_report_context(match_id, meta)
+    teams = _presentation_teams(match_id, meta)
+    score = _score_text(meta.get("resultado")) or _score_text(meta.get("score")) or _infer_score(
+        match_id, teams["home_id"], teams["away_id"]
+    )
+    buffer = io.BytesIO()
+    total_pages = 5
+
+    with PdfPages(buffer) as pdf:
+        fig, ax = _elite_pdf_page(f"Informe tactico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
+        ax.text(0.07, 0.77, f"{teams['home_name']}  {score}  {teams['away_name']}", transform=ax.transAxes, fontsize=16, weight="bold", color=PDF_INK)
+        cards = [
+            ("Secuencias rivales", metrics.get("secuencias_rivales", "-")),
+            ("Tiros", metrics.get("tiros", "-")),
+            ("Tiros a puerta", metrics.get("tiros_puerta", "-")),
+            ("Goles", metrics.get("goles", "-")),
+        ]
+        for idx, (label, value) in enumerate(cards):
+            _elite_metric_card(ax, 0.07 + (idx % 2) * 0.46, 0.57 - (idx // 2) * 0.12, 0.40, 0.09, label, value)
+        summary = (
+            f"El rival genero {metrics.get('secuencias_rivales', '-')} secuencias ofensivas, "
+            f"{metrics.get('tiros', '-')} tiros, {metrics.get('tiros_puerta', '-')} a puerta "
+            f"y {metrics.get('goles', '-')} goles dentro de las acciones analizadas."
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.17, 0.86, 0.22, "Resumen", summary, max_lines=6)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Tipologia mas danina", "Patron rival con mayor IPO medio", 2, total_pages)
+        typo_cards = [
+            ("Tipologia", critical_typology.get("tipologia", "-")),
+            ("IPO medio", critical_typology.get("ipar_medio", "-")),
+            ("Causa principal", typology_ctx["causa"]),
+            ("Zona / carril", f"{typology_ctx['zona']} - {typology_ctx['carril']}"),
+        ]
+        for idx, (label, value) in enumerate(typo_cards):
+            _elite_metric_card(ax, 0.07 + (idx % 2) * 0.46, 0.62 - (idx // 2) * 0.12, 0.40, 0.09, label, value)
+        typo_text = (
+            f"La tipologia con mayor dano medio fue {critical_typology.get('tipologia', '-')}. "
+            f"Ataco principalmente {typology_ctx['zona']} por {typology_ctx['carril']} y su causa defensiva dominante fue {typology_ctx['causa']}."
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.19, 0.86, 0.22, "Lectura", typo_text, max_lines=6)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Estructura y secuencias criticas", "KPIs asociados y acciones prioritarias", 3, total_pages)
+        struct_cards = [
+            ("IDD medio", critical_typology.get("ddi_medio", "-")),
+            ("IPO medio", critical_typology.get("ipar_medio", "-")),
+            ("xT maximo", critical_typology.get("xt_max", "-")),
+            ("Pitch control rival", critical_typology.get("pc_rival_medio", "-")),
+        ]
+        for idx, (label, value) in enumerate(struct_cards):
+            _elite_metric_card(ax, 0.07 + (idx % 2) * 0.46, 0.68 - (idx // 2) * 0.10, 0.40, 0.075, label, value)
+        _elite_pdf_table(
+            ax,
+            critical_sequences,
+            ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max", "causa_tactica"],
+            ["ID", "Min", "Tipologia", "IDD", "IPO", "xT", "Causa"],
+            [0.07, 0.28, 0.86, 0.20],
+            font_size=6.8,
+            max_rows=6,
+        )
+        _elite_pdf_text_panel(ax, 0.07, 0.10, 0.86, 0.12, "Lectura", "Estas son las acciones que conviene detener y revisar en video.", max_lines=3)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Momentum defensivo", "Tramo de mayor presion rival acumulada", 4, total_pages)
+        momentum = payload.get("momentum_critico", {})
+        momentum_cards = [
+            ("Tramo", momentum.get("tramo", "-")),
+            ("Indice temporal", momentum.get("indice_temporal", "-")),
+            ("Secuencias", momentum.get("secuencias", "-")),
+            ("Tiros", momentum.get("tiros", "-")),
+            ("IDD medio", momentum.get("idd_medio", "-")),
+            ("IPO medio", momentum.get("ipo_medio", "-")),
+        ]
+        for idx, (label, value) in enumerate(momentum_cards):
+            _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.67 - (idx // 3) * 0.11, 0.26, 0.082, label, value, accent="#f2c94c" if idx == 1 else PDF_RED)
+        _elite_pdf_text_panel(ax, 0.07, 0.18, 0.86, 0.20, "Lectura del tramo", analysis["momentum_critico"], max_lines=6)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+        fig, ax = _elite_pdf_page("Recomendaciones tacticas", "Sintesis final accionable", 5, total_pages)
+        _elite_pdf_text_panel(ax, 0.07, 0.45, 0.86, 0.30, "Puntos de mejora", analysis["recomendaciones_globales"], max_lines=9)
+        _elite_pdf_text_panel(ax, 0.07, 0.16, 0.86, 0.20, "Foco de trabajo", analysis["estructura_defensiva"], max_lines=6)
+        pdf.savefig(fig)
+        plt.close(fig)
+
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 def render_informe(match_id: int, meta: dict):
@@ -11300,6 +11437,89 @@ def render_informe(match_id: int, meta: dict):
     st.markdown(analysis["secuencias_criticas"])
 
     _subsection_heading("5. Recomendaciones tacticas")
+    st.markdown(analysis["recomendaciones_globales"])
+
+    pdf_bytes = _local_report_pdf(match_id, meta, payload, analysis)
+    st.download_button(
+        "Exportar este informe a PDF",
+        data=pdf_bytes,
+        file_name=f"informe_tactico_{match_id}.pdf",
+        mime="application/pdf",
+        type="primary",
+        use_container_width=True,
+    )
+
+
+def render_informe(match_id: int, meta: dict):
+    _page_heading("Informe")
+    _section_intro(
+        "Informe local del partido",
+        "Lectura determinista en la propia pagina: KPIs, tipologia mas danina, estructura defensiva, secuencias criticas, momentum y recomendaciones tacticas.",
+    )
+    payload = _report_payload(match_id, meta)
+    if payload.get("error"):
+        st.warning(payload["error"])
+        return
+
+    analysis = _coach_report_fallback(payload)
+    metrics = payload.get("metricas_globales", {})
+    executive = payload.get("resumen_ejecutivo", {})
+    critical_typology = _local_report_typology(payload)
+    critical_sequences = _report_records_df(payload, "secuencias_criticas")
+    seq, clusters, _, _ = _prepare_app_data(match_id, meta)
+    typology_ctx = _critical_typology_context(seq, clusters, critical_typology)
+
+    _subsection_heading("1. KPIs principales")
+    _report_metric_grid(metrics, executive)
+    st.markdown(
+        f"El rival genero **{metrics.get('secuencias_rivales', '-')} secuencias ofensivas**, "
+        f"con **{metrics.get('tiros', '-')} tiros**, **{metrics.get('tiros_puerta', '-')} a puerta** "
+        f"y **{metrics.get('goles', '-')} goles** dentro de las acciones analizadas."
+    )
+
+    _subsection_heading("2. Tipologia mas danina")
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Tipologia", critical_typology.get("tipologia", "-"))
+    c2.metric("IPO medio", critical_typology.get("ipar_medio", "-"))
+    c3.metric("Causa principal", typology_ctx["causa"])
+    c4.metric("Zona / carril", f"{typology_ctx['zona']} · {typology_ctx['carril']}")
+    if not typology_ctx["seq"].empty:
+        _plot_trajectory_fields(match_id, meta, typology_ctx["seq"], height=420)
+        _plot_density_fields(match_id, meta, typology_ctx["seq"], height=420)
+    st.markdown(
+        f"La tipologia con mayor dano medio fue **{critical_typology.get('tipologia', '-')}**. "
+        f"Su foco principal aparece en **{typology_ctx['zona']}** por **{typology_ctx['carril']}**, "
+        f"con causa defensiva dominante: **{typology_ctx['causa']}**."
+    )
+
+    _subsection_heading("3. Estructura defensiva asociada")
+    cols = st.columns(4)
+    cols[0].metric("IDD medio", critical_typology.get("ddi_medio", "-"))
+    cols[1].metric("IPO medio", critical_typology.get("ipar_medio", "-"))
+    cols[2].metric("xT maximo", critical_typology.get("xt_max", "-"))
+    cols[3].metric("Pitch control rival", critical_typology.get("pc_rival_medio", "-"))
+    st.markdown(analysis["estructura_defensiva"])
+
+    _subsection_heading("4. Secuencias mas criticas")
+    if not critical_sequences.empty:
+        _show_static_table(_sequence_display_table(critical_sequences, n=8))
+    st.markdown(
+        "Estas son las acciones que conviene detener y revisar en video, porque combinan peligro ofensivo, "
+        "desorganizacion y prioridad tactica."
+    )
+
+    _subsection_heading("5. Momentum defensivo")
+    try:
+        chrono_df = _chronology_base(seq)
+        chrono_windows = _chronology_windows(chrono_df)
+        chrono_windows = chrono_windows[pd.to_numeric(chrono_windows["secuencias"], errors="coerce").fillna(0).gt(0)]
+        critical_window = _render_critical_window_card(chrono_df, chrono_windows)
+        if critical_window is None:
+            st.info("No hay ventanas temporales suficientes para calcular momentum.")
+    except Exception:
+        st.info("No hay ventanas temporales suficientes para calcular momentum.")
+
+    _subsection_heading("6. Recomendaciones tacticas")
     st.markdown(analysis["recomendaciones_globales"])
 
     pdf_bytes = _local_report_pdf(match_id, meta, payload, analysis)
