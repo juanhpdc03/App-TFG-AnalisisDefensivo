@@ -561,7 +561,7 @@ def inject_style():
             justify-content: space-between;
             background:
                 linear-gradient(180deg, rgba(5,10,22,0.62), rgba(5,10,22,0.93)),
-                url("https://images.unsplash.com/photo-1574629810360-7efbbe195018auto=format&fit=crop&w=1600&q=80");
+                url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1600&q=80");
             background-size: cover;
             background-position: center 58%;
             box-shadow: 0 20px 46px rgba(21,34,59,0.24);
