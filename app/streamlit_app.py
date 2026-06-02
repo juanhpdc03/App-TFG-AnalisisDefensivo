@@ -102,8 +102,8 @@ REGISTERED_TEAMS = {
         "location": "Entorno privado",
         "role": "Equipo registrado",
         "description": (
-            "Entorno activo de la plataforma con tracking, eventing, tipologÃ­as ofensivas "
-            "rivales, estructura defensiva, secuencias crÃ­ticas, momentum e informe final."
+            "Entorno activo de la plataforma con tracking, eventing, tipologías ofensivas "
+            "rivales, estructura defensiva, secuencias críticas, momentum e informe final."
         ),
         "status": "Activo",
         "access_code": "demo2026",
@@ -117,11 +117,13 @@ def _clean_app_text(value):
     if not isinstance(value, str):
         return value
     text = value
+    replacement_mark = "\ufffd"
+    mojibake_marks = (chr(195), chr(194), chr(226), "\x8d", "\x81", replacement_mark)
     for _ in range(3):
-        if not any(mark in text for mark in ("Ãƒ", "Ã‚", "\x8d", "\x81")):
+        if not any(mark in text for mark in mojibake_marks):
             break
         repaired = None
-        for encoding in ("latin1", "cp1252"):
+        for encoding in ("cp1252", "latin1"):
             try:
                 repaired = text.encode(encoding).decode("utf-8")
                 break
@@ -130,8 +132,8 @@ def _clean_app_text(value):
         if not repaired or repaired == text:
             break
         text = repaired
-    if any(mark in text for mark in ("Ãƒ", "Ã‚", "Ã¯Â¿Â½")):
-        for encoding in ("latin1", "cp1252"):
+    if any(mark in text for mark in mojibake_marks):
+        for encoding in ("cp1252", "latin1"):
             try:
                 repaired = text.encode(encoding).decode("utf-8")
             except (UnicodeEncodeError, UnicodeDecodeError):
@@ -139,7 +141,7 @@ def _clean_app_text(value):
             if repaired and repaired != text:
                 text = repaired
                 break
-    return text.replace("Ã‚", "").replace("ï¿½", "")
+    return text.replace(chr(194), "").replace(chr(195) + chr(130), "").replace(replacement_mark, "")
 
 
 def _clean_text_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -156,16 +158,16 @@ APP_COLOR_MAP = {
     "T2": "#f2c94c",
     "T3": "#ead7a4",
     "T4": "#6b7280",
-    "Tipologia 1": "#c8102e",
-    "Tipologia 2": "#2453a6",
-    "Tipologia 3": "#f2c94c",
-    "Tipologia 4": "#ead7a4",
-    "Tipologia 5": "#6b7280",
-    "TipologÃ­a 1": "#c8102e",
-    "TipologÃ­a 2": "#2453a6",
-    "TipologÃ­a 3": "#f2c94c",
-    "TipologÃ­a 4": "#ead7a4",
-    "TipologÃ­a 5": "#6b7280",
+    "Tipología 1": "#c8102e",
+    "Tipología 2": "#2453a6",
+    "Tipología 3": "#f2c94c",
+    "Tipología 4": "#ead7a4",
+    "Tipología 5": "#6b7280",
+    "Tipología 1": "#c8102e",
+    "Tipología 2": "#2453a6",
+    "Tipología 3": "#f2c94c",
+    "Tipología 4": "#ead7a4",
+    "Tipología 5": "#6b7280",
     "Todas": "#c8102e",
 }
 PLOTLY_CONFIG = {
@@ -177,7 +179,7 @@ PLOTLY_CONFIG = {
 
 
 st.set_page_config(
-    page_title="Plataforma de anÃ¡lisis defensivo",
+    page_title="Plataforma de análisis defensivo",
     page_icon="TD",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -559,7 +561,7 @@ def inject_style():
             justify-content: space-between;
             background:
                 linear-gradient(180deg, rgba(5,10,22,0.62), rgba(5,10,22,0.93)),
-                url("https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=1600&q=80");
+                url("https://images.unsplash.com/photo-1574629810360-7efbbe195018auto=format&fit=crop&w=1600&q=80");
             background-size: cover;
             background-position: center 58%;
             box-shadow: 0 20px 46px rgba(21,34,59,0.24);
@@ -2631,7 +2633,7 @@ def inject_sidebar_toggle():
           }
 
           function refresh() {
-            btn.textContent = sidebarOpen() ? "Ã¢â‚¬Â¹" : "Ã¢â‚¬Âº";
+            btn.textContent = sidebarOpen()  "‹" : "›";
           }
 
           function findNativeToggle() {
@@ -2732,7 +2734,7 @@ def inject_sidebar_toggle_v2():
                 "height:16px",
                 "border-top:5px solid rgba(255,255,255,.96)",
                 "border-left:5px solid rgba(255,255,255,.96)",
-                "transform:" + (open ? "rotate(-45deg)" : "rotate(135deg)"),
+                "transform:" + (open  "rotate(-45deg)" : "rotate(135deg)"),
                 "border-radius:1px"
               ].join(";");
               btn.appendChild(arrow);
@@ -2793,7 +2795,7 @@ def inject_sidebar_toggle_v2():
 
           function hideNativeCloseButtons() {
             const sidebar = doc.querySelector('section[data-testid="stSidebar"]');
-            const buttonRoots = sidebar ? [sidebar, doc] : [doc];
+            const buttonRoots = sidebar  [sidebar, doc] : [doc];
             buttonRoots.forEach((root) => root.querySelectorAll('button, [role="button"]').forEach((button) => {
               if (button.id === "tfg-sidebar-toggle") return;
               const rect = button.getBoundingClientRect();
@@ -2802,7 +2804,7 @@ def inject_sidebar_toggle_v2():
               const title = (button.getAttribute("title") || "").toLowerCase();
               const inSidebarZone = rect.left < 420 && rect.top < 160;
               const smallTopButton = inSidebarZone && rect.width <= 82 && rect.height <= 82;
-              const looksClose = text === "Ã—" || text === "x" || text === "âœ•" || text === "âœ–" || aria.includes("close") || aria.includes("collapse") || title.includes("close") || title.includes("collapse");
+              const looksClose = text === "×" || text === "x" || text === "✕" || text === "✖" || aria.includes("close") || aria.includes("collapse") || title.includes("close") || title.includes("collapse");
               if (smallTopButton || (inSidebarZone && looksClose)) {
                 button.style.setProperty("display", "none", "important");
                 button.style.setProperty("visibility", "hidden", "important");
@@ -2816,7 +2818,7 @@ def inject_sidebar_toggle_v2():
               const text = (el.textContent || "").trim().toLowerCase();
               const aria = (el.getAttribute("aria-label") || "").toLowerCase();
               const title = (el.getAttribute("title") || "").toLowerCase();
-              const isCloseMark = text === "x" || text === "Ã—" || text === "âœ•" || text === "âœ–" || aria.includes("close") || aria.includes("collapse") || title.includes("close") || title.includes("collapse");
+              const isCloseMark = text === "x" || text === "×" || text === "✕" || text === "✖" || aria.includes("close") || aria.includes("collapse") || title.includes("close") || title.includes("collapse");
               const hasCloseSvg = el.tagName.toLowerCase() === "svg" && rect.top < 120;
               if (isCloseMark || hasCloseSvg) {
                 const target = el.closest('button, [role="button"]') || el;
@@ -3327,7 +3329,7 @@ def _normalize_user_role(role: str | None) -> str:
     clean_role = str(role or "invitado").strip().lower()
     if clean_role == "guest":
         return "invitado"
-    if clean_role in {"administracion", "administraciÃ³n", "administrator"}:
+    if clean_role in {"administracion", "administración", "administrator"}:
         return "admin"
     return clean_role if clean_role in USER_ROLES else "invitado"
 
@@ -3487,9 +3489,9 @@ def _render_xt_reference_panel():
     if isinstance(xt_items, str):
         xt_items = [
             {"label": "Baja", "range": "< 0.05", "color": "#38c172", "description": "Zonas de bajo valor esperado."},
-            {"label": "Moderada", "range": "0.05 - 0.10", "color": "#f4c542", "description": "ProgresiÃ³n con amenaza reconocible."},
+            {"label": "Moderada", "range": "0.05 - 0.10", "color": "#f4c542", "description": "Progresión con amenaza reconocible."},
             {"label": "Alta", "range": "0.10 - 0.20", "color": "#ff9f43", "description": "Entrada en zonas de peligro relevante."},
-            {"label": "Muy peligrosa", "range": ">= 0.20", "color": "#e4143a", "description": "CercanÃ­a al Ã¡rea y alto potencial de ocasiÃ³n."},
+            {"label": "Muy peligrosa", "range": ">= 0.20", "color": "#e4143a", "description": "Cercanía al área y alto potencial de ocasión."},
         ]
     levels_html = "".join(
         f"""
@@ -3506,7 +3508,7 @@ def _render_xt_reference_panel():
         f"""
         <div class="xt-reference-box">
             <div>
-                <p>Referencia xThreat: la amenaza crece cuanto mÃ¡s cerca se sitÃºa la acciÃ³n de zonas de remate. Estos niveles ayudan a leer la escala de la malla sin convertir el xT en un Ã­ndice propio.</p>
+                <p>Referencia xThreat: la amenaza crece cuanto más cerca se sitúa la acción de zonas de remate. Estos niveles ayudan a leer la escala de la malla sin convertir el xT en un índice propio.</p>
                 <div class="xt-level-grid">{levels_html}</div>
             </div>
             {image_html}
@@ -3554,7 +3556,7 @@ def _render_tipology_assignment(clusters: pd.DataFrame):
         display["patron_tactico"] = display.get("tipologia", pd.Series(dtype=str))
     for _, row in display.sort_values("cluster_trayectoria" if "cluster_trayectoria" in display.columns else "tipologia").iterrows():
         tip = html.escape(str(row.get("tipologia", "-")))
-        name = html.escape(str(row.get("patron_tactico", "TipologÃ­a sin nombre")))
+        name = html.escape(str(row.get("patron_tactico", "Tipología sin nombre")))
         color = _cluster_color(row.get("cluster_trayectoria", 0))
         rows.append(
             f'<div class="tipology-row"><span class="tipology-swatch" style="background:{color};"></span><span><strong>{tip}:</strong> {name}</span></div>'
@@ -3639,7 +3641,7 @@ def _add_plotly_red_frame(fig, x0: float = -0.065, y0: float = -0.165, x1: float
     return fig
 
 
-def _render_bar_legend(labels: list[str], title: str = "TipologÃ­a", color_map: dict[str, str] | None = None):
+def _render_bar_legend(labels: list[str], title: str = "Tipología", color_map: dict[str, str] | None = None):
     if not labels:
         return
     items = []
@@ -3900,7 +3902,7 @@ def _plot_bar(
         coloraxis_showscale=False,
     )
     _apply_plotly_theme(fig)
-    fig.update_xaxes(showgrid=False, showticklabels=red_gradient, title=(labels or {}).get(x, "TipologÃ­a"))
+    fig.update_xaxes(showgrid=False, showticklabels=red_gradient, title=(labels or {}).get(x, "Tipología"))
     fig.update_yaxes(showgrid=True)
     st.plotly_chart(fig, use_container_width=True, config=PLOTLY_CONFIG)
 
@@ -4097,7 +4099,7 @@ def _clickable_sequence_bars(
         with bar:
             button_type = "primary" if selected_id == seq_id else "secondary"
             if st.button(
-                f"{label}: {_format_metric(value)} Â· {tip}",
+                f"{label}: {_format_metric(value)} · {tip}",
                 key=f"{key_prefix}_{seq_id}",
                 type=button_type,
                 use_container_width=True,
@@ -4148,7 +4150,7 @@ def _plot_seq_scatter(seq: pd.DataFrame, title: str, height: int = 560):
         labels={
             "indice_desorganizacion": "IDD",
             "indice_peligrosidad_accion": "IPO",
-            "tipologia": "TipologÃ­a de ataque rival",
+            "tipologia": "Tipología de ataque rival",
         },
         height=height,
         title=title,
@@ -4251,9 +4253,9 @@ def _cause_label(value) -> str:
     mapping = {
         "estructura_retroceso": "problemas de repliegue",
         "estructura_anchura": "bloque demasiado abierto",
-        "presion_distancia": "poca presiÃ³n al balÃ³n",
+        "presion_distancia": "poca presión al balón",
         "pitch_control_rival": "dominio rival en zonas peligrosas",
-        "presion_distancia": "poca presiÃ³n sobre poseedor",
+        "presion_distancia": "poca presión sobre poseedor",
         "sin etiqueta": "sin causa dominante",
     }
     return mapping.get(text, text.replace("_", " ") if text and text != "nan" else "-")
@@ -4264,8 +4266,8 @@ def _sequence_type_label(value) -> str:
     mapping = {
         "ataque_elaborado": "Ataque posicional",
         "juego_directo": "Juego directo vertical",
-        "transicion_rapida": "TransiciÃ³n tras robo",
-        "balon_parado_con_continuidad": "BalÃ³n parado con continuidad",
+        "transicion_rapida": "Transición tras robo",
+        "balon_parado_con_continuidad": "Balón parado con continuidad",
         "descartada": "Secuencia descartada",
     }
     return mapping.get(text, text.replace("_", " ").capitalize() if text and text != "nan" else "-")
@@ -4285,20 +4287,20 @@ def _pattern_name(cluster_row: pd.Series, seq_cluster: pd.DataFrame | None = Non
     elif dominant_type == "juego_directo":
         base = "Juego directo vertical"
     elif dominant_type == "balon_parado_con_continuidad":
-        base = "BalÃ³n parado con segunda jugada"
+        base = "Balón parado con segunda jugada"
     elif dominant_type == "ataque_elaborado":
         if "central" in lane_lower:
-            base = "CirculaciÃ³n posicional interior"
+            base = "Circulación posicional interior"
         elif "banda" in lane_lower:
             base = f"Ataques por {_lower_first(lane)}"
         else:
-            base = "CirculaciÃ³n posicional en U"
+            base = "Circulación posicional en U"
     elif pd.notna(tiro_pct) and tiro_pct >= 25:
-        base = "TipologÃ­a de finalizaciÃ³n frecuente"
+        base = "Tipología de finalización frecuente"
     elif pd.notna(ipar) and ipar >= 0.55:
-        base = "TipologÃ­a de alta amenaza"
+        base = "Tipología de alta amenaza"
     else:
-        base = "Ataques de progresiÃ³n controlada"
+        base = "Ataques de progresión controlada"
     suffix = _zone_lane_suffix(cluster_row)
     if suffix != "Zona no identificada":
         return _sentence_label(f"{base} - {suffix}")
@@ -4354,7 +4356,7 @@ def _apply_tactical_labels(seq: pd.DataFrame, clusters: pd.DataFrame) -> tuple[p
             else:
                 label_map[cid] = label
             APP_COLOR_MAP[str(label_map[cid])] = _cluster_color(cid)
-        clusters["patron_tactico"] = clusters["cluster_trayectoria"].map(lambda v: label_map.get(int(float(v)), "TipologÃ­a sin etiquetar") if pd.notna(v) else "TipologÃ­a sin etiquetar")
+        clusters["patron_tactico"] = clusters["cluster_trayectoria"].map(lambda v: label_map.get(int(float(v)), "Tipología sin etiquetar") if pd.notna(v) else "Tipología sin etiquetar")
         clusters["tipologia"] = clusters["cluster_trayectoria"].map(_as_tipologia)
         for _, row in clusters.dropna(subset=["cluster_trayectoria"]).iterrows():
             APP_COLOR_MAP[str(row["patron_tactico"])] = _cluster_color(row["cluster_trayectoria"])
@@ -4362,7 +4364,7 @@ def _apply_tactical_labels(seq: pd.DataFrame, clusters: pd.DataFrame) -> tuple[p
         clusters["carril_dominante"] = clusters.get("carril_dominante", pd.Series(dtype=str)).apply(_lane_label)
     if not seq.empty:
         if "cluster_trayectoria" in seq.columns:
-            seq["patron_tactico"] = seq["cluster_trayectoria"].map(lambda v: label_map.get(int(float(v)), "TipologÃ­a sin etiquetar") if pd.notna(v) else "TipologÃ­a sin etiquetar")
+            seq["patron_tactico"] = seq["cluster_trayectoria"].map(lambda v: label_map.get(int(float(v)), "Tipología sin etiquetar") if pd.notna(v) else "Tipología sin etiquetar")
             seq["tipologia_id"] = seq["cluster_trayectoria"].map(_as_tipologia)
             seq["tipologia"] = seq["patron_tactico"]
         if "tipo_desorganizacion_principal" in seq.columns:
@@ -4382,7 +4384,7 @@ def _prepare_app_data(match_id: int, meta: dict) -> tuple[pd.DataFrame, pd.DataF
         if "zona_ataque" in zona.columns:
             zona["zona_ataque"] = zona["zona_ataque"].apply(_lane_label)
         if "cluster_trayectoria" in zona.columns:
-            zona["patron_tactico"] = zona["cluster_trayectoria"].map(lambda v: label_map.get(int(float(v)), "TipologÃ­a sin etiquetar") if pd.notna(v) else "TipologÃ­a sin etiquetar")
+            zona["patron_tactico"] = zona["cluster_trayectoria"].map(lambda v: label_map.get(int(float(v)), "Tipología sin etiquetar") if pd.notna(v) else "Tipología sin etiquetar")
     return _clean_text_columns(seq), _clean_text_columns(clusters), _clean_text_columns(zona), label_map
 
 
@@ -4808,7 +4810,7 @@ def _plot_xt_evolution(match_id: int, meta: dict, clusters: pd.DataFrame, height
                 borderwidth=1.4,
             )
     fig.update_layout(
-        title="EvoluciÃ³n media de la amenaza concedida por tipologÃ­a",
+        title="Evolución media de la amenaza concedida por tipología",
         height=height + 60,
         hovermode="closest",
         showlegend=False,
@@ -4933,22 +4935,22 @@ def _summary_metric_cards(seq: pd.DataFrame, clusters: pd.DataFrame, zona: pd.Da
         ("Tiros Asociados", _sum_numeric(seq, "tipo_finalizacion_tiro")),
         ("Tiros A Puerta", _sum_numeric(seq, "tipo_finalizacion_tiro_puerta")),
         ("Goles Asociados", _sum_numeric(seq, "es_gol")),
-        ("DuraciÃ³n Media", f"{_format_metric(_mean_numeric(seq, 'duracion_seg'))} s"),
+        ("Duración Media", f"{_format_metric(_mean_numeric(seq, 'duracion_seg'))} s"),
         ("Pases Medios", _mean_numeric(seq, "num_pases_bepro")),
         ("IDD Medio", _mean_numeric(seq, "indice_desorganizacion")),
         ("IPO Medio", _mean_numeric(seq, "indice_peligrosidad_accion")),
-        ("IDD MÃ¡ximo", _max_numeric(seq, "indice_desorganizacion")),
-        ("IPO MÃ¡ximo", _max_numeric(seq, "indice_peligrosidad_accion")),
-        ("xT MÃ¡ximo", _max_numeric(seq, "xT_max")),
+        ("IDD Máximo", _max_numeric(seq, "indice_desorganizacion")),
+        ("IPO Máximo", _max_numeric(seq, "indice_peligrosidad_accion")),
+        ("xT Máximo", _max_numeric(seq, "xT_max")),
         ("Pitch Control Rival Medio", _mean_numeric(seq, "control_campo_rival_medio")),
         ("Pitch Control Rival Zona Peligrosa", _mean_numeric(seq, "control_zona_peligrosa_rival_medio")),
-        ("TipologÃ­a MÃ¡s Repetida", cluster_mas_repetido),
-        ("TipologÃ­a MÃ¡s Peligrosa", patron_peligroso),
-        ("Zona MÃ¡s DaÃ±ada", zona_danada),
+        ("Tipología Más Repetida", cluster_mas_repetido),
+        ("Tipología Más Peligrosa", patron_peligroso),
+        ("Zona Más Dañada", zona_danada),
         ("Causa Principal", causa_principal),
-        ("Tramo MÃ¡s Atacado", f"{tramo} ({tramo_n})" if tramo != "-" else "-"),
-        ("Tramo MÃ¡s CrÃ­tico", tramo_critico),
-        ("Entradas Ãšltimo Tercio", entradas_ultimo_tercio),
+        ("Tramo Más Atacado", f"{tramo} ({tramo_n})" if tramo != "-" else "-"),
+        ("Tramo Más Crítico", tramo_critico),
+        ("Entradas Último Tercio", entradas_ultimo_tercio),
     ]
 
 
@@ -4984,7 +4986,7 @@ def _plot_lane_pie(seq: pd.DataFrame, title: str = "Distribucion de secuencias p
     lanes = _lane_summary(seq)
     lanes = lanes[lanes["secuencias"].gt(0)].copy()
     if lanes.empty:
-        st.info("No hay datos de carril para esta grÃ¡fica.")
+        st.info("No hay datos de carril para esta gráfica.")
         return
     lanes = lanes.sort_values("secuencias", ascending=False)
     red_scale = ["#8f0d23", "#c8102e", "#e45a67", "#f4b4b8", "#f7f0df"]
@@ -5009,7 +5011,7 @@ def _plot_lane_pie(seq: pd.DataFrame, title: str = "Distribucion de secuencias p
 def _plot_mean_passes_by_tipology(seq: pd.DataFrame, height: int = 390):
     needed = {"patron_tactico", "num_pases_bepro"}
     if seq.empty or not needed.issubset(seq.columns):
-        st.info("No hay datos de pases por tipologÃ­a para esta grÃ¡fica.")
+        st.info("No hay datos de pases por tipología para esta gráfica.")
         return
     plot_df = seq.copy()
     plot_df["num_pases_bepro"] = pd.to_numeric(plot_df["num_pases_bepro"], errors="coerce")
@@ -5020,15 +5022,15 @@ def _plot_mean_passes_by_tipology(seq: pd.DataFrame, height: int = 390):
         .sort_values("pases_medios", ascending=False)
     )
     if plot_df.empty:
-        st.info("No hay datos de pases por tipologÃ­a para esta grÃ¡fica.")
+        st.info("No hay datos de pases por tipología para esta gráfica.")
         return
     _plot_bar(
         plot_df,
         "patron_tactico",
         "pases_medios",
-        "NÃºmero medio de pases por tipologÃ­a",
+        "Número medio de pases por tipología",
         color="patron_tactico",
-        labels={"patron_tactico": "TipologÃ­a", "pases_medios": "Pases medios"},
+        labels={"patron_tactico": "Tipología", "pases_medios": "Pases medios"},
         height=height,
     )
 
@@ -5083,7 +5085,7 @@ def _metric_key_from_label(label: object) -> str | None:
     text = _display_text(label).upper()
     if text.startswith("DIF"):
         return None
-    tokens = set(re.findall(r"[A-ZÃÃ‰ÃÃ“ÃšÃœÃ‘]+", text))
+    tokens = set(re.findall(r"[A-ZÁÉÍÓÚÜÑ]+", text))
     if "IDD" in tokens:
         return "indice_desorganizacion"
     if "IPO" in tokens or "IPAR" in tokens:
@@ -5135,11 +5137,11 @@ def _as_tipologia(value) -> str:
         return "-"
     text = str(value)
     if text.lower().startswith("tipologia"):
-        return text.replace("Tipologia", "TipologÃ­a").replace("tipologia", "tipologÃ­a")
+        return text.replace("Tipología", "Tipología").replace("tipologia", "tipología")
     if text.upper().startswith("T") and text[1:].isdigit():
-        return f"TipologÃ­a {int(text[1:]) + 1}"
+        return f"Tipología {int(text[1:]) + 1}"
     try:
-        return f"TipologÃ­a {int(float(text)) + 1}"
+        return f"Tipología {int(float(text)) + 1}"
     except ValueError:
         return text
 
@@ -5154,9 +5156,9 @@ def _clusters_for_display(df: pd.DataFrame) -> pd.DataFrame:
         display["patron_tactico"] = display["cluster_trayectoria"].map(_as_tipologia)
     display = display.rename(
         columns={
-            "patron_tactico": "nombre tipologÃ­a",
+            "patron_tactico": "nombre tipología",
             "porcentaje": "% secuencias",
-            "duracion_media": "duraciÃ³n media",
+            "duracion_media": "duración media",
             "tiro_pct": "% con tiro",
             "zona_dominante": "zona dominante",
             "carril_dominante": "carril dominante",
@@ -5164,10 +5166,10 @@ def _clusters_for_display(df: pd.DataFrame) -> pd.DataFrame:
     )
     cols = [
         "tipologia",
-        "nombre tipologÃ­a",
+        "nombre tipología",
         "secuencias",
         "% secuencias",
-        "duraciÃ³n media",
+        "duración media",
         "tiros",
         "% con tiro",
         "zona dominante",
@@ -5265,7 +5267,7 @@ def _info_tip_html(text: str) -> str:
         row_class = "info-tip-row"
         if label_upper in {"IDD", "IPO"}:
             row_class += " index-row"
-        elif "Â·" in label or "%" in label:
+        elif "·" in label or "%" in label:
             row_class += " child-row"
         elif label_upper in {"PITCH CONTROL", "XTHREAT"}:
             row_class += " glossary-row"
@@ -5276,9 +5278,9 @@ def _info_tip_html(text: str) -> str:
             "</span>"
         )
     return (
-        '<span class="info-tip" tabindex="0" aria-label="InformaciÃ³n">i'
+        '<span class="info-tip" tabindex="0" aria-label="Información">i'
         '<span class="info-tip-panel">'
-        '<span class="info-tip-title">INFORMACIÃ“N</span>'
+        '<span class="info-tip-title">INFORMACIÓN</span>'
         f'<span class="info-tip-grid">{"".join(rows)}</span>'
         "</span>"
         "</span>"
@@ -5349,84 +5351,84 @@ def _summary_group_html(title: str, items: list[tuple[str, object] | list[tuple[
 
 SUMMARY_FAMILY_TITLES = (
     "Volumen Ofensivo Rival",
-    "Nivel De DesorganizaciÃ³n Defensiva",
-    "Contexto TÃ¡ctico",
+    "Nivel De Desorganización Defensiva",
+    "Contexto Táctico",
     "Contexto Temporal",
 )
 SUMMARY_INFO_TEXTS = {
     "Volumen Ofensivo Rival": (
-        "Lectura RÃ¡pida: Resume si el rival acumulÃ³ presencia ofensiva y si esa presencia acabÃ³ en amenaza real.\n"
-        "Volumen: NÃºmero de secuencias ofensivas evaluables del rival.\n"
-        "Continuidad: DuraciÃ³n media y pases medios indican si pudo instalarse y circular.\n"
-        "FinalizaciÃ³n: Tiros, tiros a puerta y goles muestran si el volumen terminÃ³ en amenaza real."
+        "Lectura Rápida: Resume si el rival acumuló presencia ofensiva y si esa presencia acabó en amenaza real.\n"
+        "Volumen: Número de secuencias ofensivas evaluables del rival.\n"
+        "Continuidad: Duración media y pases medios indican si pudo instalarse y circular.\n"
+        "Finalización: Tiros, tiros a puerta y goles muestran si el volumen terminó en amenaza real."
     ),
-    "Nivel De DesorganizaciÃ³n Defensiva": (
-        "Lectura RÃ¡pida: Explica cuÃ¡nto se deformÃ³ la estructura y cuÃ¡nto peligro real generÃ³ esa deformaciÃ³n.\n"
-        "IDD: Ãndice De DesorganizaciÃ³n Defensiva. Mide cuÃ¡nto se desordena el bloque propio.\n"
-        "10% Anchura Del Bloque: Penaliza que la lÃ­nea defensiva se estire o pierda compactaciÃ³n horizontal.\n"
-        "10% Distancia Al BalÃ³n: Penaliza que el defensor mÃ¡s cercano quede demasiado lejos del poseedor.\n"
-        "30% Retroceso Defensivo: Mide cuÃ¡nto tuvo que retroceder el bloque durante la secuencia.\n"
-        "50% Pitch Control Rival: Mide cuÃ¡nto territorio pasÃ³ a controlar el rival durante la acciÃ³n.\n"
-        "IPO: Ãndice De Peligrosidad Ofensiva. Mide cuÃ¡nto peligro ofensivo genera la secuencia rival.\n"
-        "15% Pitch Control En Zona Peligrosa: Valora si el rival controla zonas cercanas al Ã¡rea o espacios sensibles.\n"
-        "35% xThreat MÃ¡ximo: Valora el pico de amenaza esperada alcanzado por la posesiÃ³n rival.\n"
-        "50% FinalizaciÃ³n: Premia el resultado de la acciÃ³n; gol vale 1.00, tiro con xG vale 0.30 + 0.70*xG, tiro a puerta sin xG vale 0.75, tiro fuera sin xG vale 0.60, centro peligroso vale 0.30, pÃ©rdida rival a partir del 66% del campo vale 0.20, pÃ©rdida rival por debajo de ese umbral vale 0.10 y acciÃ³n sin finalizaciÃ³n vale 0.05.\n"
+    "Nivel De Desorganización Defensiva": (
+        "Lectura Rápida: Explica cuánto se deformó la estructura y cuánto peligro real generó esa deformación.\n"
+        "IDD: Índice De Desorganización Defensiva. Mide cuánto se desordena el bloque propio.\n"
+        "10% Anchura Del Bloque: Penaliza que la línea defensiva se estire o pierda compactación horizontal.\n"
+        "10% Distancia Al Balón: Penaliza que el defensor más cercano quede demasiado lejos del poseedor.\n"
+        "30% Retroceso Defensivo: Mide cuánto tuvo que retroceder el bloque durante la secuencia.\n"
+        "50% Pitch Control Rival: Mide cuánto territorio pasó a controlar el rival durante la acción.\n"
+        "IPO: Índice De Peligrosidad Ofensiva. Mide cuánto peligro ofensivo genera la secuencia rival.\n"
+        "15% Pitch Control En Zona Peligrosa: Valora si el rival controla zonas cercanas al área o espacios sensibles.\n"
+        "35% xThreat Máximo: Valora el pico de amenaza esperada alcanzado por la posesión rival.\n"
+        "50% Finalización: Premia el resultado de la acción; gol vale 1.00, tiro con xG vale 0.30 + 0.70*xG, tiro a puerta sin xG vale 0.75, tiro fuera sin xG vale 0.60, centro peligroso vale 0.30, pérdida rival a partir del 66% del campo vale 0.20, pérdida rival por debajo de ese umbral vale 0.10 y acción sin finalización vale 0.05.\n"
         "Pitch Control: Probabilidad territorial de que un equipo llegue antes o controle una zona.\n"
-        "xThreat: Amenaza esperada segÃºn la posiciÃ³n del balÃ³n y la capacidad de generar peligro desde ahÃ­."
+        "xThreat: Amenaza esperada según la posición del balón y la capacidad de generar peligro desde ahí."
     ),
-    "Contexto TÃ¡ctico": (
-        "Lectura RÃ¡pida: Traduce los nÃºmeros a comportamientos entrenables.\n"
-        "TipologÃ­a: Detecta quÃ© patrÃ³n ofensivo se repite y cuÃ¡l castiga mÃ¡s.\n"
-        "Zona: Localiza por dÃ³nde se desajusta el bloque con mÃ¡s frecuencia.\n"
+    "Contexto Táctico": (
+        "Lectura Rápida: Traduce los números a comportamientos entrenables.\n"
+        "Tipología: Detecta qué patrón ofensivo se repite y cuál castiga más.\n"
+        "Zona: Localiza por dónde se desajusta el bloque con más frecuencia.\n"
         "Causa: Resume el comportamiento defensivo que conviene corregir primero."
     ),
     "Contexto Temporal": (
-        "Lectura RÃ¡pida: SitÃºa los problemas dentro del reloj del partido.\n"
-        "Tramo MÃ¡s Atacado: Ventana donde el rival acumulÃ³ mÃ¡s secuencias.\n"
-        "Tramo MÃ¡s CrÃ­tico: Ventana donde se combinan volumen, IDD, IPO, tiros y entradas al Ãºltimo tercio.\n"
+        "Lectura Rápida: Sitúa los problemas dentro del reloj del partido.\n"
+        "Tramo Más Atacado: Ventana donde el rival acumuló más secuencias.\n"
+        "Tramo Más Crítico: Ventana donde se combinan volumen, IDD, IPO, tiros y entradas al último tercio.\n"
         "Tramo Unificado: Si ambos coinciden, se muestra una sola KPI porque el mayor volumen y el mayor riesgo aparecen en la misma fase.\n"
-        "Uso PrÃ¡ctico: Separa una fase de dominio rival de una fase realmente peligrosa."
+        "Uso Práctico: Separa una fase de dominio rival de una fase realmente peligrosa."
     ),
 }
 MOMENTUM_INFO = (
-    "ConstrucciÃ³n Del Momentum Defensivo: Acumula la presiÃ³n rival minuto a minuto.\n"
-    "35% IDD: Ãndice De DesorganizaciÃ³n Defensiva. Aporta el peso de la deformaciÃ³n del bloque.\n"
-    "35% IPO: Ãndice De Peligrosidad Ofensiva. Aporta el peso del peligro ofensivo generado por el rival.\n"
-    "20% xThreat: AÃ±ade la amenaza esperada mÃ¡xima alcanzada por la posesiÃ³n.\n"
-    "10% Ãšltimo Tercio: AÃ±ade valor cuando la secuencia entra en zonas profundas.\n"
-    "Memoria 88%: La curva conserva parte del valor anterior para que varias acciones seguidas mantengan la presiÃ³n.\n"
-    "Uso: Primero mira la curva, despuÃ©s revisa las alertas y las secuencias del tramo crÃ­tico."
+    "Construcción Del Momentum Defensivo: Acumula la presión rival minuto a minuto.\n"
+    "35% IDD: Índice De Desorganización Defensiva. Aporta el peso de la deformación del bloque.\n"
+    "35% IPO: Índice De Peligrosidad Ofensiva. Aporta el peso del peligro ofensivo generado por el rival.\n"
+    "20% xThreat: Añade la amenaza esperada máxima alcanzada por la posesión.\n"
+    "10% Último Tercio: Añade valor cuando la secuencia entra en zonas profundas.\n"
+    "Memoria 88%: La curva conserva parte del valor anterior para que varias acciones seguidas mantengan la presión.\n"
+    "Uso: Primero mira la curva, después revisa las alertas y las secuencias del tramo crítico."
 )
 
 
 MOMENTUM_INFO = (
-    "Construccion del momentum defensivo: acumula la presion rival minuto a minuto.\n"
-    "40% IDD: Indice de Desorganizacion Defensiva. Aporta el peso de la deformacion del bloque.\n"
-    "60% IPO: Indice de Peligrosidad Ofensiva Rival. Tiene mayor peso porque el modelo mide presion acumulada rival.\n"
+    "Construcción del momentum defensivo: acumula la presión rival minuto a minuto.\n"
+    "40% IDD: Índice de Desorganizacion Defensiva. Aporta el peso de la deformacion del bloque.\n"
+    "60% IPO: Índice de Peligrosidad Ofensiva Rival. Tiene mayor peso porque el modelo mide presión acumulada rival.\n"
     "EWMA: M(t)=0.80*M(t-1)+0.20*(0.40*IDD+0.60*IPO).\n"
-    "Memoria 88%: la curva conserva parte del valor anterior para que varias acciones seguidas mantengan la presion.\n"
+    "Memoria 88%: la curva conserva parte del valor anterior para que varias acciones seguidas mantengan la presión.\n"
     "Uso: primero mira la curva, despues revisa las alertas y las secuencias del tramo critico."
 )
 
 
 def _fallback_summary_family_notes(metric_map: dict[str, object]) -> dict[str, str]:
-    pattern = _format_metric(metric_map.get("TipologÃ­a MÃ¡s Peligrosa", "-"))
-    zone = _format_metric(metric_map.get("Zona MÃ¡s DaÃ±ada", "-"))
+    pattern = _format_metric(metric_map.get("Tipología Más Peligrosa", "-"))
+    zone = _format_metric(metric_map.get("Zona Más Dañada", "-"))
     cause = _format_metric(metric_map.get("Causa Principal", "-"))
-    tramo = _format_metric(metric_map.get("Tramo MÃ¡s Atacado", "-"))
-    tramo_critico = _format_metric(metric_map.get("Tramo MÃ¡s CrÃ­tico", "-"))
+    tramo = _format_metric(metric_map.get("Tramo Más Atacado", "-"))
+    tramo_critico = _format_metric(metric_map.get("Tramo Más Crítico", "-"))
     return {
-        "Volumen Ofensivo Rival": "SitÃºa El Peso Del Partido: Permite leer si el rival acumulÃ³ presencia y si esa presencia se transformÃ³ en finalizaciones claras.",
-        "Nivel De DesorganizaciÃ³n Defensiva": "Resume CuÃ¡nto Se DeformÃ³ La Estructura: Cruza control territorial cedido, IDD, IPO y llegada a zonas sensibles.",
-        "Contexto TÃ¡ctico": f"Lectura TÃ¡ctica: La lectura principal apunta a {pattern}, con especial atenciÃ³n a {zone}; la causa dominante fue {cause}.",
-        "Contexto Temporal": f"Lectura Temporal: El tramo mÃ¡s atacado fue {tramo} y el tramo mÃ¡s crÃ­tico fue {tramo_critico}.",
+        "Volumen Ofensivo Rival": "Sitúa El Peso Del Partido: Permite leer si el rival acumuló presencia y si esa presencia se transformó en finalizaciones claras.",
+        "Nivel De Desorganización Defensiva": "Resume Cuánto Se Deformó La Estructura: Cruza control territorial cedido, IDD, IPO y llegada a zonas sensibles.",
+        "Contexto Táctico": f"Lectura Táctica: La lectura principal apunta a {pattern}, con especial atención a {zone}; la causa dominante fue {cause}.",
+        "Contexto Temporal": f"Lectura Temporal: El tramo más atacado fue {tramo} y el tramo más crítico fue {tramo_critico}.",
     }
 
 
 def _summary_family_prompt(metrics_json: str) -> str:
     return (
-        "Actua como analista tactico profesional de futbol. "
-        "Necesito 4 microlecturas para el apartado Resumen de una app de analisis defensivo. "
+        "Actúa como analista táctico profesional de fútbol. "
+        "Necesito 4 microlecturas para el apartado Resumen de una app de análisis defensivo. "
         "Devuelve SOLO JSON valido, sin markdown, con estas claves exactas: "
         f"{', '.join(SUMMARY_FAMILY_TITLES)}. "
         "Cada valor debe ser una lectura global de 1 o 2 frases, en espanol, clara y profesional. "
@@ -5468,13 +5470,13 @@ def _render_summary_metric_blocks(metrics: list[tuple[str, object]]):
     def item(label: str) -> tuple[str, object]:
         return label, metric_map.get(label, "-")
 
-    tramo_atacado = _format_metric(metric_map.get("Tramo MÃ¡s Atacado", "-"))
-    tramo_critico = _format_metric(metric_map.get("Tramo MÃ¡s CrÃ­tico", "-"))
+    tramo_atacado = _format_metric(metric_map.get("Tramo Más Atacado", "-"))
+    tramo_critico = _format_metric(metric_map.get("Tramo Más Crítico", "-"))
     if tramo_atacado != "-" and tramo_atacado == tramo_critico:
-        temporal_items = [("Tramo MÃ¡s Atacado Y CrÃ­tico", tramo_atacado)]
+        temporal_items = [("Tramo Más Atacado Y Crítico", tramo_atacado)]
         temporal_cols = 1
     else:
-        temporal_items = [item("Tramo MÃ¡s Atacado"), item("Tramo MÃ¡s CrÃ­tico")]
+        temporal_items = [item("Tramo Más Atacado"), item("Tramo Más Crítico")]
         temporal_cols = 2
 
     groups = [
@@ -5482,33 +5484,33 @@ def _render_summary_metric_blocks(metrics: list[tuple[str, object]]):
             "Volumen Ofensivo Rival",
             [
                 item("Secuencias Rivales"),
-                [item("DuraciÃ³n Media"), item("Pases Medios")],
+                [item("Duración Media"), item("Pases Medios")],
                 [item("Tiros Asociados"), item("Tiros A Puerta"), item("Goles Asociados")],
             ],
             3,
             notes["Volumen Ofensivo Rival"],
         ),
         (
-            "Nivel De DesorganizaciÃ³n Defensiva",
+            "Nivel De Desorganización Defensiva",
             [
                 [item("IPO Medio"), item("IDD Medio")],
-                [item("IPO MÃ¡ximo"), item("IDD MÃ¡ximo")],
-                item("xT MÃ¡ximo"),
+                [item("IPO Máximo"), item("IDD Máximo")],
+                item("xT Máximo"),
                 [item("Pitch Control Rival Medio"), item("Pitch Control Rival Zona Peligrosa")],
             ],
             4,
-            notes["Nivel De DesorganizaciÃ³n Defensiva"],
+            notes["Nivel De Desorganización Defensiva"],
         ),
         (
-            "Contexto TÃ¡ctico",
+            "Contexto Táctico",
             [
-                item("TipologÃ­a MÃ¡s Repetida"),
-                item("TipologÃ­a MÃ¡s Peligrosa"),
-                item("Zona MÃ¡s DaÃ±ada"),
+                item("Tipología Más Repetida"),
+                item("Tipología Más Peligrosa"),
+                item("Zona Más Dañada"),
                 item("Causa Principal"),
             ],
             2,
-            notes["Contexto TÃ¡ctico"],
+            notes["Contexto Táctico"],
         ),
         (
             "Contexto Temporal",
@@ -5524,7 +5526,7 @@ def _render_summary_metric_blocks(metrics: list[tuple[str, object]]):
 def _render_desorg_metric_blocks(current: pd.DataFrame, diff_ddi: str, diff_ipar: str):
     groups = [
         (
-            "Volumen Y FinalizaciÃ³n",
+            "Volumen Y Finalización",
             [
                 ("Secuencias", len(current)),
                 [
@@ -5537,17 +5539,17 @@ def _render_desorg_metric_blocks(current: pd.DataFrame, diff_ddi: str, diff_ipar
             "",
         ),
         (
-            "Nivel De DesorganizaciÃ³n",
+            "Nivel De Desorganización",
             [
                 [
                     ("IPO Medio", _mean_numeric(current, "indice_peligrosidad_accion")),
                     ("IDD Medio", _mean_numeric(current, "indice_desorganizacion")),
                 ],
                 [
-                    ("IPO MÃ¡ximo", _max_numeric(current, "indice_peligrosidad_accion")),
-                    ("IDD MÃ¡ximo", _max_numeric(current, "indice_desorganizacion")),
+                    ("IPO Máximo", _max_numeric(current, "indice_peligrosidad_accion")),
+                    ("IDD Máximo", _max_numeric(current, "indice_desorganizacion")),
                 ],
-                ("xT MÃ¡ximo", _max_numeric(current, "xT_max")),
+                ("xT Máximo", _max_numeric(current, "xT_max")),
                 [
                     ("Pitch Control Rival Medio", _mean_numeric(current, "control_campo_rival_medio")),
                     ("Pitch Control Rival Zona Peligrosa", _mean_numeric(current, "control_zona_peligrosa_rival_medio")),
@@ -5557,7 +5559,7 @@ def _render_desorg_metric_blocks(current: pd.DataFrame, diff_ddi: str, diff_ipar
             "",
         ),
         (
-            "ComparaciÃ³n Con La Media",
+            "Comparación Con La Media",
             [
                 [("Dif. IDD", diff_ddi), ("Dif. IPO", diff_ipar)],
             ],
@@ -5582,9 +5584,9 @@ def render_login() -> bool:
                     <span>v1.0</span>
                 </div>
                 <div class="login-copy">
-                    <span class="login-kicker">Tracking Â· Eventing Â· Tactical Intelligence</span>
-                    <h1>AnÃ¡lisis defensivo avanzado</h1>
-                    <p>Visualiza secuencias crÃ­ticas, patrones ofensivos rivales y momentos de presiÃ³n acumulada
+                    <span class="login-kicker">Tracking · Eventing · Tactical Intelligence</span>
+                    <h1>Análisis defensivo avanzado</h1>
+                    <p>Visualiza secuencias críticas, patrones ofensivos rivales y momentos de presión acumulada
                     a partir de datos de tracking y eventing.</p>
                 </div>
             </div>
@@ -5608,14 +5610,14 @@ def render_login() -> bool:
             label_visibility="collapsed",
         )
         with st.form("login_form"):
-            user = st.text_input("Correo electrÃ³nico")
-            password = st.text_input("ContraseÃ±a", type="password")
+            user = st.text_input("Correo electrónico")
+            password = st.text_input("Contraseña", type="password")
             password_confirm = ""
             if mode == "Registrarse":
-                password_confirm = st.text_input("Confirmar contraseÃ±a", type="password")
+                password_confirm = st.text_input("Confirmar contraseña", type="password")
             submitted = st.form_submit_button(mode, type="primary", use_container_width=True)
         st.markdown(
-            '<div class="login-access-note">Acceso restringido para cuerpo tÃ©cnico y analistas.</div>',
+            '<div class="login-access-note">Acceso restringido para cuerpo técnico y analistas.</div>',
             unsafe_allow_html=True,
         )
         if submitted:
@@ -5646,14 +5648,14 @@ def render_login() -> bool:
             elif _login_local(clean_user, password):
                 st.rerun()
             else:
-                st.error("Usuario o contraseÃ±a incorrectos.")
+                st.error("Usuario o contraseña incorrectos.")
     return False
 
 
 def render_topbar(team: dict | None = None):
-    title = "Plataforma de anÃ¡lisis defensivo"
+    title = "Plataforma de análisis defensivo"
     if team:
-        title = f"Panel de anÃ¡lisis de la estructura defensiva | {_team_display_name(team)}"
+        title = f"Panel de análisis de la estructura defensiva | {_team_display_name(team)}"
     st.markdown(
         f"""
         <div class="app-shell">
@@ -5682,18 +5684,18 @@ def render_global_sidebar():
         _set_app_view("admin_users")
 
     if view == "admin_users":
-        if st.sidebar.button("Menu principal", use_container_width=True):
+        if st.sidebar.button("Menú principal", use_container_width=True):
             _set_app_view("portal")
     elif view == "club":
-        if st.sidebar.button("MenÃº principal", use_container_width=True):
+        if st.sidebar.button("Menú principal", use_container_width=True):
             _set_app_view("portal")
     elif view == "analysis":
-        if st.sidebar.button("MenÃº principal", use_container_width=True):
+        if st.sidebar.button("Menú principal", use_container_width=True):
             _set_app_view("portal")
         if st.sidebar.button("Espacio del club", use_container_width=True):
             _set_app_view("club", int(team["team_id"]))
 
-    if st.sidebar.button("Cerrar sesiÃ³n", use_container_width=True):
+    if st.sidebar.button("Cerrar sesión", use_container_width=True):
         _logout()
 
 
@@ -5749,7 +5751,7 @@ def _load_sequence_detail(match_id: int, meta: dict) -> pd.DataFrame:
         if df["es_gol"].dtype == bool:
             df["es_gol"] = df["es_gol"].astype(int)
         else:
-            df["es_gol"] = df["es_gol"].map(_clean_app_text).astype(str).str.lower().isin({"true", "1", "si", "sÃ­", "yes"}).astype(int)
+            df["es_gol"] = df["es_gol"].map(_clean_app_text).astype(str).str.lower().isin({"true", "1", "si", "sí", "yes"}).astype(int)
     return _clean_text_columns(df)
 
 
@@ -6175,7 +6177,7 @@ def _create_bepro_clip(match_id: int, row: pd.Series) -> dict:
 def _render_sequence_player(match_id: int, row: pd.Series):
     hls_url = _bepro_hls_url(match_id)
     if not hls_url:
-        st.warning("No encuentro la URL directa del vÃ­deo BePro para este partido. Revisa outputs/app_data/bepro_videos.csv.")
+        st.warning("No encuentro la URL directa del vídeo BePro para este partido. Revisa outputs/app_data/bepro_videos.csv.")
         return
     start, end, match_start, match_end = _sequence_bounds(match_id, row)
     minimap_payload = _sequence_minimap_payload(match_id, row)
@@ -6288,10 +6290,10 @@ def _render_sequence_player(match_id: int, row: pd.Series):
           <canvas id="xt-minimap-canvas"></canvas>
           <div id="xt-minimap-value">xThreat en tiempo real: --</div>
         </div>
-        <div id="video-controls" aria-label="Controles de reproducciÃ³n">
+        <div id="video-controls" aria-label="Controles de reproducción">
           <button id="play-toggle" type="button" title="Reproducir/Pausar">&#9654;</button>
           <button id="replay-sequence" type="button" title="Ver de nuevo">&#8634;</button>
-          <button id="zoom-out-view" type="button" title="EmpequeÃ±ecer">&minus;</button>
+          <button id="zoom-out-view" type="button" title="Empequeñecer">&minus;</button>
           <button id="zoom-in-view" type="button" title="Agrandar">+</button>
           <input id="sequence-progress" type="range" min="0" max="1000" value="0" aria-label="Progreso de la secuencia">
           <span id="sequence-time">0s / 0s</span>
@@ -6336,7 +6338,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
       const minimapBox = document.getElementById("xt-minimap");
       const minimapCanvas = document.getElementById("xt-minimap-canvas");
       const minimapValue = document.getElementById("xt-minimap-value");
-      const minimapCtx = minimapCanvas ? minimapCanvas.getContext("2d") : null;
+      const minimapCtx = minimapCanvas  minimapCanvas.getContext("2d") : null;
       let minimapReady = !!(minimap && minimap.points && minimap.points.length > 1 && minimap.grid);
       if (!minimapReady && minimapBox) {{
         minimapBox.style.display = "none";
@@ -6613,7 +6615,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
       }}
       stage.addEventListener("wheel", (event) => {{
         event.preventDefault();
-        const delta = event.deltaY < 0 ? 0.12 : -0.12;
+        const delta = event.deltaY < 0  0.12 : -0.12;
         setZoom(zoom + delta);
       }}, {{ passive: false }});
       stage.addEventListener("pointerdown", (event) => {{
@@ -6651,7 +6653,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
         ["pointerdown", "pointermove", "pointerup", "click", "dblclick", "wheel"].forEach((eventName) => {{
           controlBar.addEventListener(eventName, (event) => {{
             event.stopPropagation();
-          }}, {{ passive: eventName === "wheel" ? false : true }});
+          }}, {{ passive: eventName === "wheel"  false : true }});
         }});
       }}
       playToggle.addEventListener("click", () => {{
@@ -7044,60 +7046,60 @@ def render_portal_home():
         """
         <div class="portal-landing">
             <div class="portal-welcome">
-                <h1>Bienvenido a la plataforma de anÃ¡lisis defensivo</h1>
+                <h1>Bienvenido a la plataforma de análisis defensivo</h1>
                 <p>
-                    Esta aplicaciÃ³n estÃ¡ pensada para cualquier club que disponga de tracking y eventing.
+                    Esta aplicación está pensada para cualquier club que disponga de tracking y eventing.
                     Cada equipo registrado accede a su propio espacio, selecciona el partido que quiere revisar
-                    y abre un panel tÃ¡ctico con mÃ©tricas, mapas, secuencias crÃ­ticas, momentum e informe final.
+                    y abre un panel táctico con métricas, mapas, secuencias críticas, momentum e informe final.
                 </p>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="portal-section-title">MÃ³dulos de la aplicaciÃ³n</div>', unsafe_allow_html=True)
+    st.markdown('<div class="portal-section-title">Módulos de la aplicación</div>', unsafe_allow_html=True)
     st.markdown(
         """
         <div class="portal-module-grid">
             <div class="portal-module-card">
-                <strong>GestiÃ³n de datos deportivos</strong>
+                <strong>Gestión de datos deportivos</strong>
                 <span>Base para registrar partidos con tracking y eventing ya procesados.</span>
                 <ul>
-                    <li>SelecciÃ³n de club registrado</li>
+                    <li>Selección de club registrado</li>
                     <li>Lectura de partidos disponibles</li>
-                    <li>ActualizaciÃ³n de resultados generados</li>
+                    <li>Actualización de resultados generados</li>
                 </ul>
             </div>
             <div class="portal-module-card">
-                <strong>AnÃ¡lisis tÃ¡ctico defensivo</strong>
+                <strong>Análisis táctico defensivo</strong>
                 <span>Panel de lectura para transformar posesiones rivales en decisiones de entrenamiento.</span>
                 <ul>
-                    <li>TipologÃ­as ofensivas rivales</li>
+                    <li>Tipologías ofensivas rivales</li>
                     <li>IDD, IPO, xThreat y Pitch Control</li>
                     <li>Causas y zonas de desajuste</li>
                 </ul>
             </div>
             <div class="portal-module-card">
-                <strong>RevisiÃ³n y entrega</strong>
-                <span>Herramientas para priorizar vÃ­deo y comunicar conclusiones al cuerpo tÃ©cnico.</span>
+                <strong>Revisión y entrega</strong>
+                <span>Herramientas para priorizar vídeo y comunicar conclusiones al cuerpo técnico.</span>
                 <ul>
-                    <li>Secuencias crÃ­ticas interactivas</li>
+                    <li>Secuencias críticas interactivas</li>
                     <li>Momentum temporal del partido</li>
-                    <li>Informe PDF del anÃ¡lisis</li>
+                    <li>Informe PDF del análisis</li>
                 </ul>
             </div>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="portal-section-title">Manual rÃ¡pido de uso</div>', unsafe_allow_html=True)
+    st.markdown('<div class="portal-section-title">Manual rápido de uso</div>', unsafe_allow_html=True)
     st.markdown(
         """
         <div class="portal-steps-grid">
             <div class="portal-step-card"><strong>1. Entra a la plataforma</strong><span>Accede con tu cuenta para consultar los equipos registrados.</span></div>
-            <div class="portal-step-card"><strong>2. Selecciona equipo</strong><span>Elige el club del que quieres abrir el entorno de anÃ¡lisis.</span></div>
+            <div class="portal-step-card"><strong>2. Selecciona equipo</strong><span>Elige el club del que quieres abrir el entorno de análisis.</span></div>
             <div class="portal-step-card"><strong>3. Elige partido</strong><span>Dentro del club, selecciona el partido procesado que quieres revisar.</span></div>
-            <div class="portal-step-card"><strong>4. Revisa el panel</strong><span>Navega por resumen, tipologÃ­as, estructura defensiva, secuencias, momentum e informe.</span></div>
+            <div class="portal-step-card"><strong>4. Revisa el panel</strong><span>Navega por resumen, tipologías, estructura defensiva, secuencias, momentum e informe.</span></div>
         </div>
         """,
         unsafe_allow_html=True,
@@ -7120,7 +7122,7 @@ def render_portal_home():
                     <div class="team-card-logo">{logo}</div>
                     <div>
                         <strong>{html.escape(team_name)}</strong>
-                        <span class="team-pill">{html.escape(str(team.get("status", "Activo")))} Â· {int(team.get("matches", 0))} partidos</span>
+                        <span class="team-pill">{html.escape(str(team.get("status", "Activo")))} · {int(team.get("matches", 0))} partidos</span>
                     </div>
                 </div>
                 """,
@@ -7142,7 +7144,7 @@ def render_portal_home():
             f"""
             <div class="match-picker-card">
                 <strong>Equipo seleccionado: {html.escape(selected_team_name)}</strong>
-                <span>{html.escape(str(selected_team.get("status", "Activo")))} Â· {int(selected_team.get("matches", 0))} partidos disponibles</span>
+                <span>{html.escape(str(selected_team.get("status", "Activo")))} · {int(selected_team.get("matches", 0))} partidos disponibles</span>
             </div>
             """,
             unsafe_allow_html=True,
@@ -7157,8 +7159,8 @@ def render_portal_home():
     if pending_team_id is not None:
         pending_team = _team_by_id(int(pending_team_id))
         with st.form(f"team_code_form_{int(pending_team_id)}"):
-            code = st.text_input("CÃ³digo del equipo", type="password")
-            validate = st.form_submit_button("Validar cÃ³digo y entrar", type="primary", use_container_width=True)
+            code = st.text_input("Código del equipo", type="password")
+            validate = st.form_submit_button("Validar código y entrar", type="primary", use_container_width=True)
         if validate:
             expected = str(pending_team.get("access_code", "")).strip().lower()
             if expected and code.strip().lower() == expected:
@@ -7166,7 +7168,7 @@ def render_portal_home():
                 st.session_state.pop("team_access_error", None)
                 _set_app_view("club", int(pending_team_id))
             else:
-                st.session_state["team_access_error"] = "CÃ³digo incorrecto para este equipo."
+                st.session_state["team_access_error"] = "Código incorrecto para este equipo."
         if st.session_state.get("team_access_error"):
             st.error(st.session_state["team_access_error"])
 
@@ -7199,7 +7201,7 @@ def render_club_home(team: dict):
         <div class="club-stat-grid">
             <div class="club-stat"><b>{total_matches}</b><span>Partidos disponibles</span></div>
             <div class="club-stat"><b>{total_sequences}</b><span>Secuencias analizadas</span></div>
-            <div class="club-stat"><b>{html.escape(str(last_date))}</b><span>Ãšltimo partido analizado</span></div>
+            <div class="club-stat"><b>{html.escape(str(last_date))}</b><span>Último partido analizado</span></div>
             <div class="club-stat"><b>{html.escape(str(team.get("status", "Activo")))}</b><span>Estado del club</span></div>
         </div>
         """,
@@ -7207,7 +7209,7 @@ def render_club_home(team: dict):
     )
     st.markdown('<div class="portal-section-title">Seleccionar partido</div>', unsafe_allow_html=True)
     if matches.empty:
-        st.warning("Este equipo todavÃ­a no tiene partidos web generados.")
+        st.warning("Este equipo todavía no tiene partidos web generados.")
         st.code(_build_command(team_id=team_id), language="powershell")
         return
 
@@ -7219,12 +7221,12 @@ def render_club_home(team: dict):
         f"""
         <div class="match-picker-card">
             <strong>{html.escape(str(selected_row.get("rival", "Rival")))}</strong>
-            <span>Fecha: {html.escape(str(selected_row.get("fecha", "-")))} Â· Resultado: {html.escape(str(selected_row.get("score", "vs")))} Â· Secuencias: {html.escape(str(selected_row.get("secuencias", "-")))}</span>
+            <span>Fecha: {html.escape(str(selected_row.get("fecha", "-")))} · Resultado: {html.escape(str(selected_row.get("score", "vs")))} · Secuencias: {html.escape(str(selected_row.get("secuencias", "-")))}</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
-    if st.button("Abrir anÃ¡lisis del partido", type="primary", use_container_width=True):
+    if st.button("Abrir análisis del partido", type="primary", use_container_width=True):
         _set_app_view("analysis", team_id, selected_match_id)
 
 
@@ -7233,7 +7235,7 @@ def render_analysis_workspace(team: dict, match_id: int):
     render_topbar(team)
     team_name = _team_display_name(team)
     st.markdown(
-        f'<div class="app-breadcrumb">MenÃº principal / {html.escape(team_name)} / <b>Partido {int(match_id)}</b></div>',
+        f'<div class="app-breadcrumb">Menú principal / {html.escape(team_name)} / <b>Partido {int(match_id)}</b></div>',
         unsafe_allow_html=True,
     )
     render_hero(meta)
@@ -7241,17 +7243,17 @@ def render_analysis_workspace(team: dict, match_id: int):
 
     sections = [
         "Resumen",
-        "TipologÃ­as ofensivas",
+        "Tipologías ofensivas",
         "Estructura defensiva",
-        "Secuencias crÃ­ticas",
+        "Secuencias críticas",
         "Momentum",
         "Informe",
     ]
     section_aliases = {
-        "Ataque rival": "TipologÃ­as ofensivas",
-        "Tipologias ofensivas": "TipologÃ­as ofensivas",
+        "Ataque rival": "Tipologías ofensivas",
+        "Tipologías ofensivas": "Tipologías ofensivas",
         "Desorganizacion defensiva": "Estructura defensiva",
-        "Secuencias criticas": "Secuencias crÃ­ticas",
+        "Secuencias críticas": "Secuencias críticas",
         "Cronologia": "Momentum",
     }
     nav_key = f"main_section_{int(team['team_id'])}_{int(match_id)}"
@@ -7261,7 +7263,7 @@ def render_analysis_workspace(team: dict, match_id: int):
         st.session_state[nav_key] = "Resumen"
 
     active_section = st.radio(
-        "SecciÃ³n principal",
+        "Sección principal",
         options=sections,
         key=nav_key,
         horizontal=True,
@@ -7270,12 +7272,12 @@ def render_analysis_workspace(team: dict, match_id: int):
 
     if active_section == "Resumen":
         render_resumen(match_id, meta)
-    elif active_section == "TipologÃ­as ofensivas":
+    elif active_section == "Tipologías ofensivas":
         render_ataque_rival(match_id, meta)
     elif active_section == "Estructura defensiva":
         render_desorganizacion(match_id, meta)
-    elif active_section == "Secuencias crÃ­ticas":
-        render_secuencias_criticas(match_id, meta)
+    elif active_section == "Secuencias críticas":
+        render_secuencias_críticas(match_id, meta)
     elif active_section == "Momentum":
         render_cronologia(match_id, meta)
     elif active_section == "Informe":
@@ -7381,9 +7383,9 @@ def render_match_header(match_id: int, meta: dict):
     n_activas = resumen.get("n_tipologias_detectadas", "-")
     n_modelo = resumen.get("n_clusters_modelo", n_activas)
     if scope == "global":
-        cluster_txt = f"tipologÃ­as activas {n_activas}/{n_modelo} del modelo global"
+        cluster_txt = f"tipologías activas {n_activas}/{n_modelo} del modelo global"
     else:
-        cluster_txt = f"tipologÃ­as detectadas {n_activas}"
+        cluster_txt = f"tipologías detectadas {n_activas}"
     return cluster_txt
 
 
@@ -7393,7 +7395,7 @@ def render_resumen(match_id: int, meta: dict):
     _page_heading("Resumen")
     _section_intro(
         "Lectura ejecutiva del partido",
-        "Esta vista ofrece una lectura rÃ¡pida del partido para explicar en pocos segundos el volumen ofensivo rival, la amenaza concedida, la respuesta defensiva del bloque y los momentos clave del anÃ¡lisis.",
+        "Esta vista ofrece una lectura rápida del partido para explicar en pocos segundos el volumen ofensivo rival, la amenaza concedida, la respuesta defensiva del bloque y los momentos clave del análisis.",
     )
     metrics = _summary_metric_cards(seq, clusters, zona)
     _render_summary_metric_blocks(metrics)
@@ -7402,27 +7404,27 @@ def render_resumen(match_id: int, meta: dict):
 def render_ataque_rival(match_id: int, meta: dict):
     figs = meta["figures"]
     seq, clusters, _, _ = _prepare_app_data(match_id, meta)
-    _page_heading("TipologÃ­as ofensivas")
+    _page_heading("Tipologías ofensivas")
     _section_intro(
         "Lectura general del ataque rival",
-        "Esta pestaÃ±a resume cÃ³mo atacÃ³ el rival y quÃ© tipologÃ­as ofensivas se repitieron. Sirve para comparar rutas de balÃ³n, zonas de posesiÃ³n, volumen, ritmo y amenaza generada por cada patrÃ³n.",
+        "Esta pestaña resume cómo atacó el rival y qué tipologías ofensivas se repitieron. Sirve para comparar rutas de balón, zonas de posesión, volumen, ritmo y amenaza generada por cada patrón.",
     )
-    _subsection_heading("Trayectorias por tipologÃ­a de ataque rival")
-    st.caption("Representa la ruta del balÃ³n en cada tipologÃ­a para reconocer por dÃ³nde progresa el rival.")
+    _subsection_heading("Trayectorias por tipología de ataque rival")
+    st.caption("Representa la ruta del balón en cada tipología para reconocer por dónde progresa el rival.")
     _show_image(match_id, figs["trayectorias_cluster"], max_width=1180)
-    _subsection_heading("Mapas de calor de localizaciÃ³n del balÃ³n")
-    st.caption("Muestra las zonas donde se concentra la posesiÃ³n rival dentro de cada tipologÃ­a.")
+    _subsection_heading("Mapas de calor de localización del balón")
+    st.caption("Muestra las zonas donde se concentra la posesión rival dentro de cada tipología.")
     _show_image(match_id, figs["mapa_calor_notebook"], max_width=1180)
 
     if not clusters.empty:
-        _subsection_heading("AsignaciÃ³n de tipologÃ­as")
-        st.caption("Leyenda fija de colores y nombres: cada tipologÃ­a mantiene el mismo color en todos los grÃ¡ficos.")
+        _subsection_heading("Asignación de tipologías")
+        st.caption("Leyenda fija de colores y nombres: cada tipología mantiene el mismo color en todos los gráficos.")
         _render_tipology_assignment(clusters)
 
         clusters_plot = clusters.copy()
-        _subsection_heading("Resumen cuantitativo por tipologÃ­a de ataque rival")
+        _subsection_heading("Resumen cuantitativo por tipología de ataque rival")
         st.caption(
-            "Agrupa volumen, eficacia y reparto territorial para comparar las tipologÃ­as con el mismo cÃ³digo de color."
+            "Agrupa volumen, eficacia y reparto territorial para comparar las tipologías con el mismo código de color."
         )
         c1, c2 = st.columns([1.1, 1])
         with c1:
@@ -7430,9 +7432,9 @@ def render_ataque_rival(match_id: int, meta: dict):
                 clusters_plot,
                 "patron_tactico",
                 "secuencias",
-                "Volumen de ataques por tipologÃ­a de ataque rival",
+                "Volumen de ataques por tipología de ataque rival",
                 color="patron_tactico",
-                labels={"patron_tactico": "TipologÃ­a", "secuencias": "Secuencias"},
+                labels={"patron_tactico": "Tipología", "secuencias": "Secuencias"},
                 height=390,
             )
         with c2:
@@ -7443,9 +7445,9 @@ def render_ataque_rival(match_id: int, meta: dict):
                 clusters_plot.sort_values("tiro_pct", ascending=False),
                 "patron_tactico",
                 "tiro_pct",
-                "Probabilidad de tiro por tipologÃ­a",
+                "Probabilidad de tiro por tipología",
                 color="patron_tactico",
-                labels={"patron_tactico": "TipologÃ­a", "tiro_pct": "% con tiro"},
+                labels={"patron_tactico": "Tipología", "tiro_pct": "% con tiro"},
                 height=390,
             )
         with c2:
@@ -7453,17 +7455,17 @@ def render_ataque_rival(match_id: int, meta: dict):
                 clusters_plot.sort_values("duracion_media", ascending=False),
                 "patron_tactico",
                 "duracion_media",
-                "DuraciÃ³n media del ataque",
+                "Duración media del ataque",
                 color="patron_tactico",
-                labels={"patron_tactico": "TipologÃ­a", "duracion_media": "segundos"},
+                labels={"patron_tactico": "Tipología", "duracion_media": "segundos"},
                 height=390,
             )
-        _subsection_heading("EvoluciÃ³n media de la amenaza concedida por tipologÃ­a")
-        st.caption("Lectura tÃ¡ctica: compara cuÃ¡ndo escala el xT de cada tipologÃ­a. La zona final de la curva suele seÃ±alar el momento de aceleraciÃ³n o finalizaciÃ³n.")
+        _subsection_heading("Evolución media de la amenaza concedida por tipología")
+        st.caption("Lectura táctica: compara cuándo escala el xT de cada tipología. La zona final de la curva suele señalar el momento de aceleración o finalización.")
         _render_xt_reference_panel()
         if not _plot_xt_evolution(match_id, meta, clusters):
             _show_image(match_id, figs["amenaza_media_cluster"], max_width=1040)
-    with st.expander("Ver ficha numÃ©rica de tipologÃ­as"):
+    with st.expander("Ver ficha numérica de tipologías"):
         _show_static_table(_clusters_for_display(clusters))
 
 
@@ -7476,21 +7478,21 @@ def render_desorganizacion(match_id: int, meta: dict):
     _page_heading("Estructura defensiva")
     _section_intro(
         "Lectura general de la estructura defensiva",
-        f"Esta pestaÃ±a explica cÃ³mo respondiÃ³ el bloque de {team_name} ante cada tipologÃ­a ofensiva rival. Permite cruzar IDD, IPO, Pitch Control, xThreat y causas defensivas para priorizar correcciones.",
+        f"Esta pestaña explica cómo respondió el bloque de {team_name} ante cada tipología ofensiva rival. Permite cruzar IDD, IPO, Pitch Control, xThreat y causas defensivas para priorizar correcciones.",
     )
 
-    options = ["Seleccione una tipologÃ­a"] + [value for value in _tipology_options(seq) if value != "Todas"]
+    options = ["Seleccione una tipología"] + [value for value in _tipology_options(seq) if value != "Todas"]
     tipologia = st.selectbox(
-        "Seleccione una tipologÃ­a",
+        "Seleccione una tipología",
         options,
         key=f"desorg_tip_{match_id}",
         label_visibility="collapsed",
     )
-    if tipologia == "Seleccione una tipologÃ­a":
+    if tipologia == "Seleccione una tipología":
         return
 
-    _subsection_heading("DesorganizaciÃ³n defensiva propia por tipologÃ­a de ataque rival")
-    st.caption("KPIs defensivos, relaciÃ³n IDD/IPO y secuencias prioritarias de la tipologÃ­a seleccionada.")
+    _subsection_heading("Desorganización defensiva propia por tipología de ataque rival")
+    st.caption("KPIs defensivos, relación IDD/IPO y secuencias prioritarias de la tipología seleccionada.")
     summary = _tipology_summary(seq)
     current = _filter_tipology(seq, tipologia)
     _selected_heading(tipologia)
@@ -7508,10 +7510,10 @@ def render_desorganizacion(match_id: int, meta: dict):
     st.markdown('<div class="graph-section-gap"></div>', unsafe_allow_html=True)
     c1, c2 = st.columns([1.1, 1])
     with c1:
-        st.caption("Cruza la desorganizaciÃ³n concedida con la peligrosidad de cada secuencia filtrada.")
-        _plot_seq_scatter(current, "RelaciÃ³n IDD/IPO del filtro")
+        st.caption("Cruza la desorganización concedida con la peligrosidad de cada secuencia filtrada.")
+        _plot_seq_scatter(current, "Relación IDD/IPO del filtro")
     with c2:
-        st.caption("Resume las causas defensivas mÃ¡s repetidas dentro de la tipologÃ­a seleccionada.")
+        st.caption("Resume las causas defensivas más repetidas dentro de la tipología seleccionada.")
         top_causes = current.get("causa_tactica", pd.Series(dtype=str)).fillna("sin causa dominante").value_counts().reset_index()
         top_causes.columns = ["causa", "secuencias"]
         _plot_bar(
@@ -7526,34 +7528,34 @@ def render_desorganizacion(match_id: int, meta: dict):
         )
 
     top_ddi = current.sort_values("indice_desorganizacion", ascending=False)
-    with st.expander("Secuencias que mÃ¡s rompen la estructura", expanded=False):
-        st.caption("Ordena las acciones por IDD para detectar dÃ³nde se rompe antes la organizaciÃ³n defensiva.")
+    with st.expander("Secuencias que más rompen la estructura", expanded=False):
+        st.caption("Ordena las acciones por IDD para detectar dónde se rompe antes la organización defensiva.")
         _show_static_table(_sequence_display_table(top_ddi, n=6))
 
     top_ipar = current.sort_values("indice_peligrosidad_accion", ascending=False)
-    with st.expander("Secuencias con mÃ¡s amenaza/peligro", expanded=False):
-        st.caption("Ordena las acciones por IPO para priorizar las que generan mÃ¡s peligro real.")
+    with st.expander("Secuencias con más amenaza/peligro", expanded=False):
+        st.caption("Ordena las acciones por IPO para priorizar las que generan más peligro real.")
         _show_static_table(_sequence_display_table(top_ipar, n=6))
 
 
-def render_secuencias_criticas(match_id: int, meta: dict):
+def render_secuencias_críticas(match_id: int, meta: dict):
     seq, _, _, _ = _prepare_app_data(match_id, meta)
     if seq.empty:
         st.info("No hay detalle por secuencia para este partido.")
         return
     team_name = _team_name_for_id(meta, meta.get("team_id", TEAM_ID_DEFAULT), "el equipo analizado")
 
-    _page_heading("Secuencias crÃ­ticas")
+    _page_heading("Secuencias críticas")
     _section_intro(
-        "Lectura general de las secuencias crÃ­ticas",
-        "Esta pestaÃ±a concentra las jugadas que conviene revisar en vÃ­deo primero. Puedes filtrar, ordenar por prioridad, abrir la lectura tÃ¡ctica de cada barra y cargar el vÃ­deo solo cuando lo necesites.",
+        "Lectura general de las secuencias críticas",
+        "Esta pestaña concentra las jugadas que conviene revisar en vídeo primero. Puedes filtrar, ordenar por prioridad, abrir la lectura táctica de cada barra y cargar el vídeo solo cuando lo necesites.",
     )
-    _subsection_heading("Jugada crÃ­tica: filtrar, ordenar y revisar")
-    st.caption("Filtra por todas las tipologÃ­as o por una concreta, y ordena solo por IDD, IPO o prioridad combinada. La grÃ¡fica muestra el top 5 de acciones para revisar primero.")
+    _subsection_heading("Jugada crítica: filtrar, ordenar y revisar")
+    st.caption("Filtra por todas las tipologías o por una concreta, y ordena solo por IDD, IPO o prioridad combinada. La gráfica muestra el top 5 de acciones para revisar primero.")
     filter_col, sort_col_ui = st.columns([1.15, 1])
     with filter_col:
         tipologia_filter = st.selectbox(
-            "TipologÃ­a",
+            "Tipología",
             _tipology_options(seq),
             key=f"crit_tipologia_{match_id}",
         )
@@ -7599,7 +7601,7 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         color="tipologia",
         selected_id=int(selected) if selected is not None else None,
         key=f"crit_bar_select_{match_id}_{tipologia_filter}_{criterio}",
-        labels={"secuencia": "Secuencia", sort_col: criterio, "tipologia": "TipologÃ­a"},
+        labels={"secuencia": "Secuencia", sort_col: criterio, "tipologia": "Tipología"},
         height=500,
         color_map=pattern_color_map,
     )
@@ -7625,15 +7627,15 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         return f"{value:+.0f}%" if pd.notna(value) else "-"
     causa = row.get("causa_tactica", _cause_label(row.get("tipo_desorganizacion_principal", "-")))
     if causa == "dominio rival en zonas peligrosas":
-        narrative = "El rival consiguio dominar espacio util cerca de zonas peligrosas y obligo al bloque a defender hacia atras."
+        narrative = "El rival consiguió dominar espacio útil cerca de zonas peligrosas y obligó al bloque a defender hacia atrás."
     elif causa == "problemas de repliegue":
-        narrative = f"La secuencia obligÃ³ a {team_name} a replegar con urgencia y elevÃ³ la desorganizaciÃ³n del bloque."
+        narrative = f"La secuencia obligó a {team_name} a replegar con urgencia y elevó la desorganización del bloque."
     elif causa == "bloque demasiado abierto":
-        narrative = "El rival encontrÃ³ separaciÃ³n entre defensores y pudo atacar intervalos con mÃ¡s facilidad."
-    elif causa == "poca presion sobre poseedor" or causa == "poca presiÃ³n sobre poseedor":
-        narrative = "El poseedor rival tuvo demasiado tiempo para orientar la accion y progresar."
+        narrative = "El rival encontró separación entre defensores y pudo atacar intervalos con más facilidad."
+    elif causa == "poca presión sobre poseedor" or causa == "poca presión sobre poseedor":
+        narrative = "El poseedor rival tuvo demasiado tiempo para orientar la acción y progresar."
     else:
-        narrative = "La secuencia combina ruptura estructural y amenaza suficiente para ser revisada en vÃ­deo."
+        narrative = "La secuencia combina ruptura estructural y amenaza suficiente para ser revisada en video."
     tipologia_txt = html.escape(_display_text(row.get("tipologia", "-")))
     causa_txt = html.escape(_display_text(causa))
     narrative_txt = html.escape(_display_text(narrative))
@@ -7654,12 +7656,12 @@ def render_secuencias_criticas(match_id: int, meta: dict):
                 <div class="sequence-kpi"><span>xT max</span><strong>{_format_metric(xt_video_max)}</strong></div>
                 <div class="sequence-kpi"><span>Incremento xT</span><strong>{_format_metric(xt_video_added)}</strong></div>
             </div>
-            <div class="sequence-read-box"><strong>Lectura tÃ¡ctica:</strong> {narrative_txt}</div>
+            <div class="sequence-read-box"><strong>Lectura táctica:</strong> {narrative_txt}</div>
             <div class="sequence-tag-grid">
-                <div class="sequence-tag"><span>ComparaciÃ³n tipologÃ­a</span><strong>IDD {_delta_text(ddi_vs)} &middot; IPO {_delta_text(ipar_vs)} &middot; xT {_delta_text(xt_vs)}</strong></div>
+                <div class="sequence-tag"><span>Comparación tipología</span><strong>IDD {_delta_text(ddi_vs)} &middot; IPO {_delta_text(ipar_vs)} &middot; xT {_delta_text(xt_vs)}</strong></div>
                 <div class="sequence-tag"><span>Causa defensiva</span><strong>{causa_txt}</strong></div>
                 <div class="sequence-tag"><span>Finalizacion</span><strong>{finalizacion_txt}</strong></div>
-                <div class="sequence-tag"><span>Eventos accion</span><strong>{_format_metric(row.get('num_eventos'))}</strong></div>
+                <div class="sequence-tag"><span>Eventos acción</span><strong>{_format_metric(row.get('num_eventos'))}</strong></div>
             </div>
         </div>
         """,
@@ -7681,13 +7683,13 @@ def render_secuencias_criticas(match_id: int, meta: dict):
         elif False:
             _, _, start, end = _sequence_bounds(match_id, row)
             st.caption(
-                "Abre la pestaÃ±a de vÃ­deo del partido en BePro. Segundo objetivo: "
+                "Abre la pestaña de vídeo del partido en BePro. Segundo objetivo: "
                 f"{_hms_from_value(start)} - {_hms_from_value(end)}. "
                 "Abre el partido nativo de BePro y usa este tiempo como referencia."
             )
     else:
         st.caption(
-            "El salto al vÃ­deo queda preparado. Falta configurar BEPRO_VIDEO_URL_TEMPLATE con el patrÃ³n real de enlace "
+            "El salto al vídeo queda preparado. Falta configurar BEPRO_VIDEO_URL_TEMPLATE con el patrón real de enlace "
             "(por ejemplo usando match_id y seconds)."
         )
 
@@ -7732,7 +7734,7 @@ def _chronology_base(seq: pd.DataFrame) -> pd.DataFrame:
     df["momentum_evento"] = (
         MOMENTUM_IDD_WEIGHT * df["ddi"] + MOMENTUM_IPO_WEIGHT * df["ipar"]
     ).clip(0, 1)
-    df["tipologia"] = df.get("tipologia", pd.Series("TipologÃ­a no identificada", index=df.index)).fillna("TipologÃ­a no identificada").astype(str)
+    df["tipologia"] = df.get("tipologia", pd.Series("Tipología no identificada", index=df.index)).fillna("Tipología no identificada").astype(str)
     lane_col = "y_fin" if "y_fin" in df.columns else "ball_y_fin_m" if "ball_y_fin_m" in df.columns else None
     df["carril"] = df[lane_col].apply(_lane_from_y) if lane_col else "Desconocido"
     return df
@@ -7881,14 +7883,14 @@ def _render_temporal_alert_card(df: pd.DataFrame, window: pd.Series, tone: str, 
     sec = int(len(part))
     stress = float(window.get("stress", 0) or 0) * 100
     tone_text = {
-        "critical": "Prioridad mÃ¡xima: tramo con mayor mezcla de volumen, desorganizaciÃ³n, peligro y finalizaciÃ³n.",
-        "warning": "Tramo a vigilar: no es el peor pico, pero acumula seÃ±ales suficientes para revisar contexto.",
-        "stable": "Referencia estable: tramo con menor estrÃ©s relativo y mejor control defensivo dentro del partido.",
+        "critical": "Prioridad máxima: tramo con mayor mezcla de volumen, desorganización, peligro y finalización.",
+        "warning": "Tramo a vigilar: no es el peor pico, pero acumula señales suficientes para revisar contexto.",
+        "stable": "Referencia estable: tramo con menor estrés relativo y mejor control defensivo dentro del partido.",
     }.get(tone, "")
     if tone == "critical":
-        tone_text = "Prioridad maxima: tramo donde la curva EWMA de presion rival se mantiene mas alta."
+        tone_text = "Prioridad máxima: tramo donde la curva EWMA de presión rival se mantiene más alta."
     elif tone == "warning":
-        tone_text = "Tramo a vigilar: no es el peor pico, pero conserva presion acumulada suficiente para revisar contexto."
+        tone_text = "Tramo a vigilar: no es el peor pico, pero conserva presión acumulada suficiente para revisar contexto."
     elif tone == "stable":
         tone_text = "Referencia estable: tramo con menor estres relativo y mejor control defensivo dentro del partido."
     st.markdown(
@@ -7902,8 +7904,8 @@ def _render_temporal_alert_card(df: pd.DataFrame, window: pd.Series, tone: str, 
             <div><span>{ddi_html}</span><small>IDD medio</small></div>
             <div><span>{ipar_html}</span><small>IPO medio</small></div>
             <div><span>{shots}</span><small>tiros</small></div>
-            <div><span>{shot_zone}</span><small>entradas Ãºltimo tercio</small></div>
-            <div><span>{html.escape(_short_pattern_name(pattern_txt, 25))}</span><small>tipologÃ­a dominante</small></div>
+            <div><span>{shot_zone}</span><small>entradas último tercio</small></div>
+            <div><span>{html.escape(_short_pattern_name(pattern_txt, 25))}</span><small>tipología dominante</small></div>
             <div><span>{html.escape(lane_txt)}</span><small>carril dominante</small></div>
           </div>
           <p>{html.escape(tone_text)}</p>
@@ -7931,16 +7933,16 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
     sec = int(len(part))
     collapse = float(top.get("stress", 0) or 0) * 100
     interpretation = (
-        f"El rival concentrÃ³ {sec} secuencias en este tramo y elevÃ³ el estrÃ©s defensivo con "
-        f"{_short_pattern_name(pattern_txt, 74)}. La zona mÃ¡s repetida fue {lane_txt}; "
-        f"la mezcla de IDD {ddi:.2f}, IPO {ipar:.2f} y {shot_zone} entradas al Ãºltimo tercio "
-        "marca el momento donde el partido exige revisiÃ³n prioritaria."
+        f"El rival concentró {sec} secuencias en este tramo y elevó el estrés defensivo con "
+        f"{_short_pattern_name(pattern_txt, 74)}. La zona más repetida fue {lane_txt}; "
+        f"la mezcla de IDD {ddi:.2f}, IPO {ipar:.2f} y {shot_zone} entradas al último tercio "
+        "marca el momento donde el partido exige revisión prioritaria."
     )
     interpretation = (
         f"El rival concentro {sec} secuencias en este tramo y elevo el momentum defensivo con "
-        f"{_short_pattern_name(pattern_txt, 74)}. La zona mas repetida fue {lane_txt}; "
+        f"{_short_pattern_name(pattern_txt, 74)}. La zona más repetida fue {lane_txt}; "
         f"la combinacion media de IDD {ddi:.2f} e IPO {ipar:.2f} explica el periodo donde "
-        "la presion acumulada exige revision prioritaria."
+        "la presión acumulada exige revisión prioritaria."
     )
     st.markdown(
         f"""
@@ -8006,16 +8008,16 @@ def _render_critical_window_card(df: pd.DataFrame, windows: pd.DataFrame) -> pd.
           }}
         </style>
         <div class="chrono-critical-card">
-          <div class="chrono-critical-kicker">TRAMO CRÃTICO DETECTADO</div>
+          <div class="chrono-critical-kicker">TRAMO CRÍTICO DETECTADO</div>
           <div class="chrono-critical-title">{html.escape(tramo)}'</div>
           <div class="chrono-critical-grid">
             <div><span>{sec}</span><small>secuencias rivales</small></div>
             <div><span>{ddi_html}</span><small>IDD medio</small></div>
             <div><span>{ipar_html}</span><small>IPO medio</small></div>
             <div><span>{shots}</span><small>tiros</small></div>
-            <div><span>{shot_zone}</span><small>entradas Ãºltimo tercio</small></div>
+            <div><span>{shot_zone}</span><small>entradas último tercio</small></div>
             <div><span>{collapse:.0f}%</span><small>Momentum defensivo</small></div>
-            <div><span>{html.escape(_short_pattern_name(pattern_txt, 24))}</span><small>tipologÃ­a dominante</small></div>
+            <div><span>{html.escape(_short_pattern_name(pattern_txt, 24))}</span><small>tipología dominante</small></div>
             <div><span>{html.escape(lane_txt)}</span><small>carril dominante</small></div>
           </div>
           <p>{html.escape(interpretation)}</p>
@@ -8043,7 +8045,7 @@ def _plot_defensive_momentum(df: pd.DataFrame, critical: pd.Series | None):
     fig.add_hline(y=MOMENTUM_STRESS_THRESHOLD, line_dash="dot", line_color="rgba(200,16,46,0.72)", line_width=1)
     fig.add_annotation(x=1, y=MOMENTUM_ALERT_THRESHOLD / 2, text="CONTROLADO", showarrow=False, font=dict(color="#8ee1ad", size=11), bgcolor="rgba(32,37,50,0.54)")
     fig.add_annotation(x=1, y=(MOMENTUM_ALERT_THRESHOLD + MOMENTUM_STRESS_THRESHOLD) / 2, text="ALERTA", showarrow=False, font=dict(color="#f2c94c", size=11), bgcolor="rgba(32,37,50,0.54)")
-    fig.add_annotation(x=1, y=min(y_upper - 0.025, MOMENTUM_STRESS_THRESHOLD + 0.035), text="ESTRES ALTO", showarrow=False, font=dict(color="#ff8a9b", size=11), bgcolor="rgba(32,37,50,0.54)")
+    fig.add_annotation(x=1, y=min(y_upper - 0.025, MOMENTUM_STRESS_THRESHOLD + 0.035), text="ESTRÉS ALTO", showarrow=False, font=dict(color="#ff8a9b", size=11), bgcolor="rgba(32,37,50,0.54)")
     if critical is not None and "tramo" in critical:
         start, end, _ = _window_interval(critical)
         fig.add_vrect(x0=start, x1=end, fillcolor="rgba(200,16,46,0.08)", line_width=0, layer="below")
@@ -8079,7 +8081,7 @@ def _plot_defensive_momentum(df: pd.DataFrame, critical: pd.Series | None):
         else:
             x_vals = events["minuto_partido"]
             y_vals = np.interp(events["minuto_partido"], timeline["minuto"], timeline["momentum"]) + y_offset
-            text_vals = ["âš½"] * len(events)
+            text_vals = ["⚽"] * len(events)
         fig.add_trace(
             go.Scatter(
                 x=x_vals,
@@ -8166,7 +8168,7 @@ def _plot_typology_timeline(df: pd.DataFrame):
             ),
             hovertemplate=(
                 "Secuencia %{customdata[0]}<br>%{customdata[1]}"
-                "<br>Minuto %{base:.1f}<br>DuraciÃ³n %{x:.1f} min"
+                "<br>Minuto %{base:.1f}<br>Duración %{x:.1f} min"
                 "<br>IDD %{customdata[2]} | IPO %{customdata[3]} | xT %{customdata[4]}<extra></extra>"
             ),
             showlegend=False,
@@ -8174,7 +8176,7 @@ def _plot_typology_timeline(df: pd.DataFrame):
     )
     for minute in [15, 30, 45, 60, 75, 90]:
         fig.add_vline(x=minute, line_dash="dot", line_color="rgba(255,255,255,0.16)", line_width=1)
-    fig.update_layout(title="Timeline de tipologÃ­as: insistencia, duraciÃ³n y finalizaciÃ³n", height=330, bargap=0.22, showlegend=False)
+    fig.update_layout(title="Timeline de tipologías: insistencia, duración y finalización", height=330, bargap=0.22, showlegend=False)
     _apply_plotly_theme(fig)
     fig.update_xaxes(title="Minuto de partido")
     fig.update_yaxes(title="", automargin=True)
@@ -8186,15 +8188,15 @@ def _render_momentum_formula_note():
         """
         <div class="momentum-formula-card">
           <strong>Como se calcula el momentum defensivo</strong>
-          <span>Cada secuencia rival se transforma primero en una senal de presion defensiva. Esa senal combina desorganizacion del bloque y peligrosidad ofensiva rival.</span>
+          <span>Cada secuencia rival se transforma primero en una senal de presión defensiva. Esa senal combina desorganización del bloque y peligrosidad ofensiva rival.</span>
           <div class="momentum-formula-grid">
-            <div><b>IDD</b><em>40%</em><span>Cuanto mas se rompe la estructura, mas sube la curva.</span></div>
+            <div><b>IDD</b><em>40%</em><span>Cuanto más se rompe la estructura, más sube la curva.</span></div>
             <div><b>IPO</b><em>60%</em><span>Prioriza el agobio rival y el peligro ofensivo generado.</span></div>
-            <div><b>alpha</b><em>0.80</em><span>Conserva memoria temporal de la presion anterior.</span></div>
-            <div><b>EWMA</b><em>12%</em><span>Integra la nueva senal sin que una accion aislada distorsione la lectura.</span></div>
+            <div><b>alpha</b><em>0.80</em><span>Conserva memoria temporal de la presión anterior.</span></div>
+            <div><b>EWMA</b><em>12%</em><span>Integra la nueva senal sin que una acción aislada distorsione la lectura.</span></div>
           </div>
-          <span>La curva se actualiza como M(t)=0.80*M(t-1)+0.20*(0.40*IDD+0.60*IPO). Por eso una accion aislada genera un pico contenido, mientras que varias llegadas seguidas sostienen el momentum rival.</span>
-          <span>Las alertas temporales se calculan sobre la curva acumulada en tramos de 15 minutos, priorizando los intervalos donde la presion se mantiene mas alta.</span>
+          <span>La curva se actualiza como M(t)=0.80*M(t-1)+0.20*(0.40*IDD+0.60*IPO). Por eso una acción aislada genera un pico contenido, mientras que varias llegadas seguidas sostienen el momentum rival.</span>
+          <span>Las alertas temporales se calculan sobre la curva acumulada en tramos de 15 minutos, priorizando los intervalos donde la presión se mantiene más alta.</span>
         </div>
         """,
         unsafe_allow_html=True,
@@ -8212,9 +8214,9 @@ def _render_window_reading(windows: pd.DataFrame):
     calm = readable.sort_values("stress", ascending=True).iloc[0]
     shot_window = readable.sort_values(["tiros", "stress"], ascending=False).iloc[0]
     cols = st.columns(3)
-    cols[0].metric("Tramo mÃ¡s exigente", f"{top['tramo']}'", f"PresiÃ³n {float(top['stress']) * 100:.0f}%")
-    cols[1].metric("Tramo mÃ¡s estable", f"{calm['tramo']}'", f"{int(calm['secuencias'])} secuencias")
-    cols[2].metric("Tramo con mÃ¡s remate", f"{shot_window['tramo']}'", f"{int(shot_window['tiros'])} tiros")
+    cols[0].metric("Tramo más exigente", f"{top['tramo']}'", f"Presión {float(top['stress']) * 100:.0f}%")
+    cols[1].metric("Tramo más estable", f"{calm['tramo']}'", f"{int(calm['secuencias'])} secuencias")
+    cols[2].metric("Tramo con más remate", f"{shot_window['tramo']}'", f"{int(shot_window['tiros'])} tiros")
 
 
 def _phase_label(row: pd.Series) -> tuple[str, str]:
@@ -8222,7 +8224,7 @@ def _phase_label(row: pd.Series) -> tuple[str, str]:
     shots = float(row.get("tiros", 0) or 0)
     entries = float(row.get("entradas_ultimo_tercio", 0) or 0)
     if stress >= MOMENTUM_STRESS_THRESHOLD or shots >= 2:
-        return "ESTRES ALTO", "Bloque bajo presion acumulada: el rival sostiene amenaza y obliga a defender cerca del area."
+        return "ESTRÉS ALTO", "Bloque bajo presión acumulada: el rival sostiene amenaza y obliga a defender cerca del área."
     if stress >= MOMENTUM_ALERT_THRESHOLD or entries >= 2:
         return "ALERTA", "Presion rival creciente: conviene revisar ajustes de carril, saltos y coberturas."
     return "CONTROLADO", "Control defensivo razonable: pocas secuencias de alto impacto acumulado en el tramo."
@@ -8236,7 +8238,7 @@ def _render_phase_blocks(windows: pd.DataFrame):
         if int(row.get("secuencias", 0) or 0) == 0:
             continue
         label, text = _phase_label(row)
-        color = {"CONTROLADO": "#2ea05a", "ALERTA": "#f2c94c", "ESTRES ALTO": "#c8102e"}[label]
+        color = {"CONTROLADO": "#2ea05a", "ALERTA": "#f2c94c", "ESTRÉS ALTO": "#c8102e"}[label]
         blocks.append(
             f"""
             <div class="chrono-phase-card" style="border-color:{color};">
@@ -8253,7 +8255,7 @@ def _render_phase_blocks(windows: pd.DataFrame):
 def render_cronologia(match_id: int, meta: dict):
     seq, _, _, _ = _prepare_app_data(match_id, meta)
     if seq.empty or "minuto_partido" not in seq.columns:
-        st.info("No hay cronologÃ­a por secuencia para este partido.")
+        st.info("No hay cronología por secuencia para este partido.")
         return
 
     st.markdown(
@@ -8495,12 +8497,12 @@ def render_cronologia(match_id: int, meta: dict):
 
     df = _chronology_base(seq)
     if df.empty:
-        st.info("No hay cronologÃ­a por secuencia para este partido.")
+        st.info("No hay cronología por secuencia para este partido.")
         return
     _page_heading("Momentum")
     _section_intro(
         "Lectura general del momentum",
-        "Esta pestaÃ±a ordena el partido en el tiempo para detectar cuÃ¡ndo se acumulÃ³ la presiÃ³n rival. Primero aparece la curva de momentum y despuÃ©s los tramos y secuencias que conviene revisar.",
+        "Esta pestaña ordena el partido en el tiempo para detectar cuándo se acumuló la presión rival. Primero aparece la curva de momentum y después los tramos y secuencias que conviene revisar.",
     )
     windows = _chronology_windows(df)
     selected_windows = _selected_temporal_windows(windows)
@@ -8510,7 +8512,7 @@ def render_cronologia(match_id: int, meta: dict):
     _plot_defensive_momentum(df, critical)
 
     _subsection_heading("Alertas temporales del partido")
-    st.caption("El partido se resume en tres tramos: el pico crÃ­tico, un tramo de alerta a vigilar y el intervalo mÃ¡s estable como referencia.")
+    st.caption("El partido se resume en tres tramos: el pico crítico, un tramo de alerta a vigilar y el intervalo más estable como referencia.")
     for tone, title, window in selected_windows:
         _render_temporal_alert_card(df, window, tone, title)
         start, end, tramo = _window_interval(window)
@@ -8529,7 +8531,7 @@ def render_riesgo(match_id: int, meta: dict):
         _show_image(match_id, figs["matriz_ddi_ipar"])
     with c2:
         _show_image(match_id, figs["matriz_5x5"])
-    _subsection_heading("Ranking de secuencias criticas")
+    _subsection_heading("Ranking de secuencias críticas")
     _show_image(match_id, figs["ranking_secuencias"])
     _show_table(_load_table(match_id, tables["ranking_secuencias"]), height=280)
     _subsection_heading("Resumen de riesgo por tipologia")
@@ -8539,7 +8541,7 @@ def render_riesgo(match_id: int, meta: dict):
 def render_danio(match_id: int, meta: dict):
     figs = meta["figures"]
     tables = meta["tables"]
-    _page_heading("Causas del dano real")
+    _page_heading("Causas del daño real")
     c1, c2 = st.columns(2)
     with c1:
         _show_image(match_id, figs["causas_danio"])
@@ -8550,7 +8552,7 @@ def render_danio(match_id: int, meta: dict):
     _subsection_heading("Perfiles extremos")
     c3, c4 = st.columns(2)
     with c3:
-        st.caption("Dano alto sin gran desorganizacion")
+        st.caption("Daño alto sin gran desorganización")
         _show_table(_load_table(match_id, tables["danio_sin_desorden_simple"]), height=240)
     with c4:
         st.caption("Caos estructural sin castigo")
@@ -8559,14 +8561,14 @@ def render_danio(match_id: int, meta: dict):
 
 def _top_pattern_text(seq: pd.DataFrame, metric: str, min_rows: int = 2) -> str:
     if seq.empty or "tipologia" not in seq.columns or metric not in seq.columns:
-        return "patrÃ³n no identificado"
+        return "patrón no identificado"
     grouped = (
         seq.groupby("tipologia", as_index=False)
         .agg(valor=(metric, "mean"), secuencias=("secuencia_rival_id", "count"))
         .query("secuencias >= @min_rows")
     )
     if grouped.empty:
-        return "patrÃ³n no identificado"
+        return "patrón no identificado"
     row = grouped.sort_values("valor", ascending=False).iloc[0]
     return f"{row['tipologia']} ({row['valor']:.2f})"
 
@@ -8609,7 +8611,7 @@ def _report_payload(match_id: int, meta: dict) -> dict:
     equipo = _team_name_for_id(meta, meta.get("team_id", TEAM_ID_DEFAULT), "Tu Equipo")
     rival = _team_name_for_id(meta, meta.get("rival_team_id"), "Equipo Rival")
     if seq.empty:
-        return {"match_id": int(match_id), "rival": rival, "error": "No hay secuencias suficientes para generar informe tÃ¡ctico."}
+        return {"match_id": int(match_id), "rival": rival, "error": "No hay secuencias suficientes para generar informe táctico."}
 
     pattern_summary = pd.DataFrame()
     if "tipologia" in seq.columns:
@@ -8740,7 +8742,7 @@ def _report_payload(match_id: int, meta: dict) -> dict:
         "tipologias": _records_for_report(pattern_summary, list(pattern_summary.columns)),
         "causas_defensivas": _records_for_report(causes, ["causa", "secuencias"], n=8),
         "analisis_temporal": _records_for_report(temporal, list(temporal.columns)),
-        "secuencias_criticas": _records_for_report(critical, critical_cols, n=8),
+        "secuencias_críticas": _records_for_report(critical, critical_cols, n=8),
         "secuencias_top_idd": _records_for_report(seq_top_idd, critical_cols, n=5),
         "secuencias_top_ipo": _records_for_report(seq_top_ipo, critical_cols, n=5),
         "momentum_critico": momentum_critico,
@@ -8752,9 +8754,9 @@ def _report_payload(match_id: int, meta: dict) -> dict:
             "momento_critico": momentum_critico.get("tramo", f"{tramo}"),
         },
         "notas_metodologicas": {
-            "idd": "Ãndice De DesorganizaciÃ³n Defensiva 0-1: Anchura, distancia al balÃ³n, retroceso y Pitch Control rival.",
-            "ipar": "Ãndice De Peligrosidad Ofensiva 0-1: Pitch Control peligroso, xT mÃ¡ximo y score de finalizaciÃ³n.",
-            "regla_ia": "La IA redacta e interpreta, pero no debe inventar informaciÃ³n fuera del JSON.",
+            "idd": "Índice De Desorganización Defensiva 0-1: Anchura, distancia al balón, retroceso y Pitch Control rival.",
+            "ipar": "Índice De Peligrosidad Ofensiva 0-1: Pitch Control peligroso, xT máximo y score de finalización.",
+            "regla_ia": "La IA redacta e interpreta, pero no debe inventar información fuera del JSON.",
         },
     }
 
@@ -8766,12 +8768,12 @@ def _fallback_tactical_report(payload: dict) -> str:
     rival = payload["rival"]
     equipo = payload.get("equipo", "Equipo analizado")
     tipologias = payload.get("tipologias", [])
-    top_freq = max(tipologias, key=lambda x: x.get("secuencias", 0), default={}).get("tipologia", "Patron no identificado")
-    top_danger = max(tipologias, key=lambda x: x.get("ipar_medio") or 0, default={}).get("tipologia", "Patron no identificado")
-    top_ddi = max(tipologias, key=lambda x: x.get("ddi_medio") or 0, default={}).get("tipologia", "Patron no identificado")
+    top_freq = max(tipologias, key=lambda x: x.get("secuencias", 0), default={}).get("tipologia", "Patrón no identificado")
+    top_danger = max(tipologias, key=lambda x: x.get("ipar_medio") or 0, default={}).get("tipologia", "Patrón no identificado")
+    top_ddi = max(tipologias, key=lambda x: x.get("ddi_medio") or 0, default={}).get("tipologia", "Patrón no identificado")
     causes = payload.get("causas_defensivas", [])
     cause_txt = causes[0]["causa"] if causes else "Causa no identificada"
-    critical = payload.get("secuencias_criticas", [])
+    critical = payload.get("secuencias_críticas", [])
     critical_lines = "\n".join(
         f"- Secuencia {s.get('secuencia_rival_id')} ({s.get('minuto_partido')}'): {s.get('tipologia')}. "
         f"IDD {s.get('indice_desorganizacion')}, IPO {s.get('indice_peligrosidad_accion')}, xT {s.get('xT_max')}. "
@@ -8786,36 +8788,36 @@ def _fallback_tactical_report(payload: dict) -> str:
         f"| {t.get('tramo')} | {t.get('secuencias')} | {t.get('ddi_medio')} | {t.get('ipar_medio')} | {t.get('tiros')} | {t.get('goles')} |"
         for t in payload.get("analisis_temporal", [])
     )
-    return f"""# Informe tÃ¡ctico postpartido: {equipo} vs {rival}
+    return f"""# Informe táctico postpartido: {equipo} vs {rival}
 
 ## 1. Resumen general
-El rival generÃ³ **{metrics['secuencias_rivales']} secuencias ofensivas evaluables**, con **{metrics['tiros']} tiros**, **{metrics['tiros_puerta']} a puerta** y **{metrics['goles']} goles asociados**. La desorganizaciÃ³n defensiva media fue **IDD {metrics['ddi_medio']}** y la peligrosidad media fue **IPO {metrics['ipar_medio']}**. Hubo **{metrics['secuencias_alta_amenaza']} secuencias de alta amenaza**.
+El rival generó **{metrics['secuencias_rivales']} secuencias ofensivas evaluables**, con **{metrics['tiros']} tiros**, **{metrics['tiros_puerta']} a puerta** y **{metrics['goles']} goles asociados**. La desorganización defensiva media fue **IDD {metrics['ddi_medio']}** y la peligrosidad media fue **IPO {metrics['ipar_medio']}**. Hubo **{metrics['secuencias_alta_amenaza']} secuencias de alta amenaza**.
 
-La zona mÃ¡s daÃ±ada fue **{metrics['zona_mas_danada']}** y el tramo con mayor volumen rival fue **{metrics['tramo_mas_atacado']}**.
+La zona más dañada fue **{metrics['zona_mas_danada']}** y el tramo con mayor volumen rival fue **{metrics['tramo_mas_atacado']}**.
 
-## 2. TipologÃ­as de ataque rival
-El patrÃ³n mÃ¡s repetido fue **{top_freq}**. El patrÃ³n mÃ¡s peligroso por IPO medio fue **{top_danger}**. El patrÃ³n que mÃ¡s desorganizÃ³ al bloque fue **{top_ddi}**.
+## 2. Tipologías de ataque rival
+El patrón más repetido fue **{top_freq}**. El patrón más peligroso por IPO medio fue **{top_danger}**. El patrón que más desorganizó al bloque fue **{top_ddi}**.
 
-| PatrÃ³n ofensivo | Secuencias | IDD medio | IPO medio | Tiros | Goles |
+| Patrón ofensivo | Secuencias | IDD medio | IPO medio | Tiros | Goles |
 |---|---:|---:|---:|---:|---:|
 {pattern_lines}
 
-## 3. OrganizaciÃ³n defensiva de {equipo}
-La causa defensiva mÃ¡s frecuente fue **{cause_txt}**. La lectura principal es que el equipo debe priorizar ajustes en protecciÃ³n de espacios, presiÃ³n al poseedor y respuesta tras pÃ©rdida o reinicio, especialmente en los patrones con IDD alto.
+## 3. Organización defensiva de {equipo}
+La causa defensiva más frecuente fue **{cause_txt}**. La lectura principal es que el equipo debe priorizar ajustes en protección de espacios, presión al poseedor y respuesta tras pérdida o reinicio, especialmente en los patrones con IDD alto.
 
-## 4. Jugadas crÃ­ticas
+## 4. Jugadas críticas
 {critical_lines}
 
-## 5. AnÃ¡lisis temporal
+## 5. Análisis temporal
 | Tramo | Secuencias | IDD medio | IPO medio | Tiros | Goles |
 |---|---:|---:|---:|---:|---:|
 {temporal_lines}
 
 ## 6. Conclusiones operativas
-- Revisar en vÃ­deo las secuencias con IDD e IPO altos, no solo las que terminan en tiro.
-- Ajustar la protecciÃ³n de la zona mÃ¡s daÃ±ada: **{metrics['zona_mas_danada']}**.
-- Preparar una correcciÃ³n especÃ­fica para **{top_danger}**, por ser el patrÃ³n que mÃ¡s amenaza genera.
-- Reforzar mecanismos de reorganizaciÃ³n tras pÃ©rdida cuando aparezcan transiciones o ataques directos.
+- Revisar en vídeo las secuencias con IDD e IPO altos, no solo las que terminan en tiro.
+- Ajustar la protección de la zona más dañada: **{metrics['zona_mas_danada']}**.
+- Preparar una corrección específica para **{top_danger}**, por ser el patrón que más amenaza genera.
+- Reforzar mecanismos de reorganización tras pérdida cuando aparezcan transiciones o ataques directos.
 """
 
 
@@ -8838,19 +8840,19 @@ def _ollama_model() -> str:
 def _ollama_prompt(payload: dict) -> str:
     equipo = payload.get("equipo", "equipo analizado")
     return (
-        f"ActÃºa como analista tÃ¡ctico profesional de {equipo}. "
+        f"Actúa como analista táctico profesional de {equipo}. "
         "Genera un informe postpartido completo, claro, accionable y listo para imprimir. "
-        "No inventes datos que no estÃ©n en el JSON. Si falta un dato, dilo de forma prudente. "
-        "Traduce IDD, IPO, pitch control y xT a lenguaje tÃ¡ctico comprensible para entrenador. "
+        "No inventes datos que no estén en el JSON. Si falta un dato, dilo de forma prudente. "
+        "Traduce IDD, IPO, pitch control y xT a lenguaje táctico comprensible para entrenador. "
         "Estructura obligatoria en Markdown:\n"
         "1. Resumen general\n"
-        "2. TipologÃ­as de ataque rival\n"
-        f"3. OrganizaciÃ³n defensiva de {equipo}\n"
-        "4. Jugadas crÃ­ticas prioritarias\n"
-        "5. AnÃ¡lisis temporal del partido\n"
+        "2. Tipologías de ataque rival\n"
+        f"3. Organización defensiva de {equipo}\n"
+        "4. Jugadas críticas prioritarias\n"
+        "5. Análisis temporal del partido\n"
         "6. Conclusiones y tareas defensivas a mejorar\n\n"
-        "Incluye tablas Markdown solo cuando ayuden a resumir patrones, tramos o secuencias crÃ­ticas. "
-        "El tono debe ser tÃ©cnico, directo y Ãºtil para un entrenador con poco tiempo.\n\n"
+        "Incluye tablas Markdown solo cuando ayuden a resumir patrones, tramos o secuencias críticas. "
+        "El tono debe ser técnico, directo y útil para un entrenador con poco tiempo.\n\n"
         f"JSON DEL PARTIDO:\n{json.dumps(payload, ensure_ascii=False, indent=2)}"
     )
 
@@ -8871,7 +8873,7 @@ def _call_ollama_report(payload: dict) -> str:
     parts = data.get("candidates", [{}])[0].get("content", {}).get("parts", [])
     text = "\n".join(part.get("text", "") for part in parts).strip()
     if not text:
-        raise RuntimeError("Ollama no devolviÃ³ texto para el informe.")
+        raise RuntimeError("Ollama no devolvió texto para el informe.")
     return text
 
 
@@ -8943,14 +8945,14 @@ def _markdown_to_pdf_bytes(markdown_text: str, title: str) -> bytes:
 
 def _legacy_tactical_report_unused(match_id: int, meta: dict) -> str:
     if seq.empty:
-        return "No hay secuencias suficientes para generar informe tÃ¡ctico."
+        return "No hay secuencias suficientes para generar informe táctico."
     resumen = meta.get("resumen", {})
     rival = _team_name_for_id(meta, meta.get("rival_team_id"), "Equipo Rival")
     team_name = _team_name_for_id(meta, meta.get("team_id", TEAM_ID_DEFAULT), "el equipo analizado")
     ddi = pd.to_numeric(seq.get("indice_desorganizacion"), errors="coerce").mean()
     ipar = pd.to_numeric(seq.get("indice_peligrosidad_accion"), errors="coerce").mean()
     high = int(pd.to_numeric(seq.get("indice_peligrosidad_accion"), errors="coerce").gt(0.75).sum())
-    top_freq = seq["tipologia"].mode().iloc[0] if "tipologia" in seq.columns and not seq["tipologia"].mode().empty else "patrÃ³n no identificado"
+    top_freq = seq["tipologia"].mode().iloc[0] if "tipologia" in seq.columns and not seq["tipologia"].mode().empty else "patrón no identificado"
     top_danger = _top_pattern_text(seq, "indice_peligrosidad_accion")
     top_ddi = _top_pattern_text(seq, "indice_desorganizacion")
     cause = seq.get("causa_tactica", pd.Series(dtype=str)).mode()
@@ -8966,27 +8968,27 @@ def _legacy_tactical_report_unused(match_id: int, meta: dict) -> str:
             f"Tiro/a puerta/gol: {int(row.get('tipo_finalizacion_tiro', 0))}/"
             f"{int(row.get('tipo_finalizacion_tiro_puerta', 0))}/{int(row.get('es_gol', 0))}."
         )
-    strengths = f"{team_name} contuvo varias posesiones sin finalizaciÃ³n clara" if _sum_numeric(seq, "tipo_finalizacion_tiro") < resumen.get("tiros_rival", 0) else f"{team_name} redujo parte de la amenaza antes del remate final"
+    strengths = f"{team_name} contuvo varias posesiones sin finalización clara" if _sum_numeric(seq, "tipo_finalizacion_tiro") < resumen.get("tiros_rival", 0) else f"{team_name} redujo parte de la amenaza antes del remate final"
     return f"""
 ### 1. Resumen ejecutivo
-El rival analizado, **{rival}**, activÃ³ **{len(seq)} secuencias ofensivas evaluables**. El comportamiento defensivo medio dejÃ³ un **IDD {ddi:.2f}** y un **IPO {ipar:.2f}**, con **{high} secuencias de alta amenaza**. El patrÃ³n mÃ¡s frecuente fue **{top_freq}**, mientras que el mÃ¡s peligroso fue **{top_danger}**.
+El rival analizado, **{rival}**, activó **{len(seq)} secuencias ofensivas evaluables**. El comportamiento defensivo medio dejó un **IDD {ddi:.2f}** y un **IPO {ipar:.2f}**, con **{high} secuencias de alta amenaza**. El patrón más frecuente fue **{top_freq}**, mientras que el más peligroso fue **{top_danger}**.
 
 ### 2. Identidad ofensiva del rival
-El rival generÃ³ mÃ¡s volumen a travÃ©s de **{top_freq}**. La amenaza no depende solo del nÃºmero de ataques: el patrÃ³n con mayor daÃ±o medio fue **{top_danger}**, lo que indica quÃ© tipo de acciÃ³n conviene preparar en vÃ­deo y charla.
+El rival generó más volumen a través de **{top_freq}**. La amenaza no depende solo del número de ataques: el patrón con mayor daño medio fue **{top_danger}**, lo que indica qué tipo de acción conviene preparar en vídeo y charla.
 
-### 3. DÃ³nde sufriÃ³ la defensa
-La causa defensiva dominante fue **{cause_txt}**. El patrÃ³n que mÃ¡s desorganizÃ³ al equipo fue **{top_ddi}**. Esto sugiere revisar especialmente la protecciÃ³n del espacio, la distancia al poseedor y la respuesta del bloque tras pÃ©rdida o reinicio.
+### 3. Dónde sufrió la defensa
+La causa defensiva dominante fue **{cause_txt}**. El patrón que más desorganizó al equipo fue **{top_ddi}**. Esto sugiere revisar especialmente la protección del espacio, la distancia al poseedor y la respuesta del bloque tras pérdida o reinicio.
 
 ### 4. Momentos del partido
-El tramo con mayor volumen ofensivo rival fue **{tramo}**, con **{tramo_n} secuencias**. Este intervalo debe revisarse junto con las secuencias crÃ­ticas para entender si el daÃ±o vino por fatiga, contexto de marcador, pÃ©rdidas o problemas de ajuste defensivo.
+El tramo con mayor volumen ofensivo rival fue **{tramo}**, con **{tramo_n} secuencias**. Este intervalo debe revisarse junto con las secuencias críticas para entender si el daño vino por fatiga, contexto de marcador, pérdidas o problemas de ajuste defensivo.
 
-### 5. Secuencias crÃ­ticas prioritarias
+### 5. Secuencias críticas prioritarias
 {chr(10).join(bullets)}
 
-### 6. ConclusiÃ³n operativa
-- Mejorar protecciÃ³n tras pÃ©rdida cuando el rival activa transiciones.
-- Reducir distancia entre lÃ­neas en acciones con {cause_txt}.
-- Priorizar la revisiÃ³n de vÃ­deo de **{top_danger}**.
+### 6. Conclusión operativa
+- Mejorar protección tras pérdida cuando el rival activa transiciones.
+- Reducir distancia entre líneas en acciones con {cause_txt}.
+- Priorizar la revisión de vídeo de **{top_danger}**.
 - Mantener como fortaleza: {strengths.lower()}.
 """
 
@@ -9000,7 +9002,7 @@ def _deep_fallback_report_sections(payload: dict) -> dict[str, str]:
     metrics = payload.get("metricas_globales", {})
     tipologias = payload.get("tipologias", [])
     temporal = payload.get("analisis_temporal", [])
-    critical = payload.get("secuencias_criticas", [])
+    critical = payload.get("secuencias_críticas", [])
     causes = payload.get("causas_defensivas", [])
     top_freq = max(tipologias, key=lambda x: x.get("secuencias", 0), default={})
     top_danger = max(tipologias, key=lambda x: x.get("ipar_medio") or 0, default={})
@@ -9014,18 +9016,18 @@ def _deep_fallback_report_sections(payload: dict) -> dict[str, str]:
             f"con {metrics.get('tiros', '-')} tiros dentro de secuencia y {metrics.get('tiros_puerta', '-')} a puerta. "
             f"La lectura global combina un IDD medio de {metrics.get('ddi_medio', '-')} y un IPO medio de "
             f"{metrics.get('ipar_medio', '-')}, por lo que el foco no debe limitarse al remate final, sino a las "
-            "situaciones en las que el rival consiguio progresar con control territorial y aumentar amenaza antes de finalizar."
+            "situaciones en las que el rival consiguió progresar con control territorial y aumentar amenaza antes de finalizar."
         ),
         "ataque_rival": (
-            f"El patron mas repetido fue {_short_pattern_name(top_freq.get('tipologia', '-'), 80)}, mientras que el patron "
+            f"El patrón más repetido fue {_short_pattern_name(top_freq.get('tipologia', '-'), 80)}, mientras que el patrón "
             f"con mayor peligrosidad media fue {_short_pattern_name(top_danger.get('tipologia', '-'), 80)}. "
-            "Esto indica que volumen y peligro no siempre aparecen en el mismo tipo de accion: conviene separar los patrones "
-            "que el rival repite mucho de aquellos que, aunque aparezcan menos, castigan mas por calidad de llegada."
+            "Esto indica que volumen y peligro no siempre aparecen en el mismo tipo de acción: conviene separar los patrones "
+            "que el rival repite mucho de aquellos que, aunque aparezcan menos, castigan más por calidad de llegada."
         ),
         "organizacion_defensiva": (
-            f"El patron que mas desordeno al bloque fue {_short_pattern_name(top_ddi.get('tipologia', '-'), 80)}. "
-            f"La causa defensiva dominante fue {cause}. En terminos practicos, el equipo debe revisar distancias entre lineas, "
-            "orientacion de la presion sobre poseedor y proteccion de espalda cuando el rival entra en zonas de amenaza."
+            f"El patrón que más desordenó al bloque fue {_short_pattern_name(top_ddi.get('tipologia', '-'), 80)}. "
+            f"La causa defensiva dominante fue {cause}. En términos prácticos, el equipo debe revisar distancias entre líneas, "
+            "orientación de la presión sobre poseedor y protección de espalda cuando el rival entra en zonas de amenaza."
         ),
         "temporal": (
             f"El tramo con mayor volumen fue {top_temporal.get('tramo', metrics.get('tramo_mas_atacado', '-'))}. "
@@ -9034,12 +9036,12 @@ def _deep_fallback_report_sections(payload: dict) -> dict[str, str]:
         ),
         "jugadas": (
             f"Las secuencias prioritarias para revisar son {crit_txt}. Deben verse atendiendo a cinco elementos: minuto, tipologia, "
-            "IDD, IPO, xT maximo y causa defensiva. Si una accion combina IDD alto e IPO alto, es prioritaria aunque no termine en gol."
+            "IDD, IPO, xT máximo y causa defensiva. Si una acción combina IDD alto e IPO alto, es prioritaria aunque no termine en gol."
         ),
         "conclusiones": (
             f"Conclusiones: 1) preparar ajustes especificos para {_short_pattern_name(top_danger.get('tipologia', '-'), 80)}; "
-            f"2) proteger {metrics.get('zona_mas_danada', 'la zona mas danada')} con mejores coberturas; "
-            "3) reducir tiempo y espacio del poseedor en progresion; 4) usar el ranking de secuencias para seleccionar clips de video."
+            f"2) proteger {metrics.get('zona_mas_danada', 'la zona más danada')} con mejores coberturas; "
+            "3) reducir tiempo y espacio del poseedor en progresión; 4) usar el ranking de secuencias para seleccionar clips de video."
         ),
     }
 
@@ -9051,11 +9053,11 @@ def _ollama_structured_report(payload: dict) -> dict[str, str]:
         return fallback
     equipo = payload.get("equipo", "equipo analizado")
     prompt = (
-        f"Eres analista tactico profesional de {equipo}. Redacta un informe mas profundo y util para cuerpo tecnico. "
+        f"Eres analista táctico profesional de {equipo}. Redacta un informe más profundo y útil para cuerpo técnico. "
         "No inventes datos. Usa solo el JSON. Devuelve SOLO JSON valido con estas claves: "
         "resumen_global, ataque_rival, organizacion_defensiva, temporal, jugadas, conclusiones. "
-        "Cada clave debe contener entre 4 y 7 lineas de analisis tactico, con precision, interpretacion y acciones practicas. "
-        "No uses markdown, no uses tablas, no uses comillas tipograficas.\n\n"
+        "Cada clave debe contener entre 4 y 7 líneas de análisis táctico, con precision, interpretacion y acciones prácticas. "
+        "No uses markdown, no uses tablas, no uses comillas tipográficas.\n\n"
         f"JSON:\n{json.dumps(payload, ensure_ascii=False)}"
     )
     try:
@@ -9158,7 +9160,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     subtitle = f"{ctx['fecha']} | {ctx['competicion']}"
 
     with PdfPages(buffer) as pdf:
-        fig, ax = _pdf_new_page(f"Informe tactico partido {match_id}", subtitle)
+        fig, ax = _pdf_new_page(f"Informe táctico partido {match_id}", subtitle)
         _pdf_add_image(fig, _logo_path(teams["home_id"]), (0.09, 0.735, 0.12, 0.10))
         _pdf_add_image(fig, _logo_path(teams["away_id"]), (0.79, 0.735, 0.12, 0.10))
         ax.text(0.27, 0.79, teams["home_name"], transform=ax.transAxes, fontsize=14, weight="bold", color="#111827", ha="center")
@@ -9170,9 +9172,9 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         y = _pdf_section(ax, 0.60, "Resumen global")
         cards = [
             ("Secuencias rivales", metrics.get("secuencias_rivales")),
-            ("Patron + repetido", _short_pattern_name(_best_pattern(payload, "secuencias"))),
-            ("Patron + peligroso", _short_pattern_name(_best_pattern(payload, "ipar_medio"))),
-            ("Zona + daÃ±ada", metrics.get("zona_mas_danada")),
+            ("Patrón + repetido", _short_pattern_name(_best_pattern(payload, "secuencias"))),
+            ("Patrón + peligroso", _short_pattern_name(_best_pattern(payload, "ipar_medio"))),
+            ("Zona + dañada", metrics.get("zona_mas_danada")),
             ("Tramo + atacado", metrics.get("tramo_mas_atacado")),
             ("IDD | IPO | PC", f"{metrics.get('ddi_medio')} | {metrics.get('ipar_medio')} | {metrics.get('pc_rival_medio')}"),
         ]
@@ -9182,26 +9184,26 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("TipologÃ­as de ataque rival", "Mapa territorial, volumen y eficacia por patrÃ³n")
+        fig, ax = _pdf_new_page("Tipologías de ataque rival", "Mapa territorial, volumen y eficacia por patrón")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("mapa_calor_notebook", "mapa_calor_clusters.png")), (0.08, 0.55, 0.84, 0.29))
         _pdf_wrapped(ax, 0.10, 0.515, analysis["ataque_rival"], size=8.9, width=95, line_height=0.018)
         _pdf_clean_table(
             ax,
             clusters_display,
             ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "duracion_media", "zona_dominante", "carril_dominante"],
-            ["TipologÃ­a", "N", "%", "Tiros", "A puerta", "Dur.", "Zona", "Carril"],
+            ["Tipología", "N", "%", "Tiros", "A puerta", "Dur.", "Zona", "Carril"],
             [0.08, 0.13, 0.84, 0.25],
             max_rows=8,
         )
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("OrganizaciÃ³n defensiva propia", "IDD, IPO, Pitch Control y causas principales")
+        fig, ax = _pdf_new_page("Organización defensiva propia", "IDD, IPO, Pitch Control y causas principales")
         _pdf_clean_table(
             ax,
             riesgo,
             ["cluster_trayectoria", "secuencias", "ddi_medio", "ipar_medio", "tiros", "tiros_puerta"],
-            ["TipologÃ­a", "N", "IDD med.", "IPO med.", "Tiros", "A puerta"],
+            ["Tipología", "N", "IDD med.", "IPO med.", "Tiros", "A puerta"],
             [0.08, 0.67, 0.84, 0.17],
             max_rows=6,
         )
@@ -9211,7 +9213,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("Analisis temporal", "Tramos de partido, tiros y evolucion IDD/IPO")
+        fig, ax = _pdf_new_page("Análisis temporal", "Tramos de partido, tiros y evolución IDD/IPO")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("evolucion_temporal_tiros", "evolucion_temporal_tiros.png")), (0.09, 0.56, 0.82, 0.27))
         temporal = pd.DataFrame(payload.get("analisis_temporal", []))
         _pdf_clean_table(
@@ -9226,7 +9228,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("Jugadas criticas y plan de mejora", "Secuencias prioritarias para revisar en video")
+        fig, ax = _pdf_new_page("Jugadas críticas y plan de mejora", "Secuencias prioritarias para revisar en video")
         _pdf_clean_table(
             ax,
             ranking,
@@ -9236,7 +9238,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             max_rows=8,
         )
         _pdf_wrapped(ax, 0.10, 0.60, analysis["jugadas"], size=9.3, width=95, line_height=0.019)
-        y = _pdf_section(ax, 0.39, "Conclusiones y lineas a mejorar")
+        y = _pdf_section(ax, 0.39, "Conclusiones y líneas a mejorar")
         _pdf_wrapped(ax, 0.10, y, analysis["conclusiones"], size=9.6, width=95, line_height=0.020)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
@@ -9246,14 +9248,14 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 
 
 def render_informe(match_id: int, meta: dict):
-    _page_heading("Informe tÃ¡ctico automÃ¡tico")
+    _page_heading("Informe táctico automático")
     report_key = f"ollama_report_{match_id}"
     source_key = f"ollama_report_source_{match_id}"
     payload_key = f"ollama_report_payload_{match_id}"
 
     st.caption(
         "Genera un informe imprimible a partir de las metricas del partido: resumen, patrones ofensivos, "
-        "organizacion defensiva, jugadas criticas, lectura temporal y tareas de mejora."
+        "organizacion defensiva, jugadas críticas, lectura temporal y tareas de mejora."
     )
 
     c1, c2, c3 = st.columns([1.2, 1, 1])
@@ -9272,7 +9274,7 @@ def render_informe(match_id: int, meta: dict):
     if generate:
         if not _ollama_api_key():
             st.warning("No hay clave de Ollama configurada. Se muestra el informe local.")
-        with st.spinner("Generando informe tactico local..."):
+        with st.spinner("Generando informe táctico local..."):
             report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=True)
             st.session_state[report_key] = report_text
             st.session_state[source_key] = source
@@ -9286,17 +9288,17 @@ def render_informe(match_id: int, meta: dict):
         report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=False)
 
     if source == "ollama":
-        st.success("Informe generado con Ollama a partir del JSON tactico del partido.")
+        st.success("Informe generado con Ollama a partir del JSON táctico del partido.")
     else:
-        st.info("Informe local disponible. Pulsa el boton de Ollama para generar una redaccion tactica mas completa.")
+        st.info("Informe local disponible. Pulsa el botón de Ollama para generar una redacción tactica más completa.")
 
-    pdf_bytes = _markdown_to_pdf_bytes(report_text, title=f"Informe tactico partido {match_id}")
+    pdf_bytes = _markdown_to_pdf_bytes(report_text, title=f"Informe táctico partido {match_id}")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button(
             "Descargar informe en PDF",
             data=pdf_bytes,
-            file_name=f"informe_tactico_{match_id}.pdf",
+            file_name=f"informe_táctico_{match_id}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -9304,7 +9306,7 @@ def render_informe(match_id: int, meta: dict):
         st.download_button(
             "Descargar informe en Markdown",
             data=report_text.encode("utf-8"),
-            file_name=f"informe_tactico_{match_id}.md",
+            file_name=f"informe_táctico_{match_id}.md",
             mime="text/markdown",
             use_container_width=True,
         )
@@ -9367,7 +9369,7 @@ def _report_header_html(match_id: int, meta: dict) -> str:
             </div>
         </div>
         <div class="report-title">
-            <h2>Informe tactico defensivo</h2>
+            <h2>Informe táctico defensivo</h2>
             <p>Partido {int(match_id)} | {html.escape(date_label)} | {html.escape(score)}</p>
         </div>
         <div class="report-team away">
@@ -9405,11 +9407,11 @@ def _report_callouts_html(payload: dict) -> str:
     top_danger = max(tipologias, key=lambda x: x.get("ipar_medio") or 0, default={}).get("tipologia", "-")
     top_ddi = max(tipologias, key=lambda x: x.get("ddi_medio") or 0, default={}).get("tipologia", "-")
     items = [
-        ("Patron mas repetido", top_freq),
+        ("Patrón más repetido", top_freq),
         ("Mayor peligro IPO", top_danger),
-        ("Mayor desorganizacion IDD", top_ddi),
-        ("Zona mas danada", metrics.get("zona_mas_danada", "-")),
-        ("Tramo mas atacado", metrics.get("tramo_mas_atacado", "-")),
+        ("Mayor desorganización IDD", top_ddi),
+        ("Zona más danada", metrics.get("zona_mas_danada", "-")),
+        ("Tramo más atacado", metrics.get("tramo_mas_atacado", "-")),
         ("Alta amenaza", f"{metrics.get('secuencias_alta_amenaza', 0)} secuencias"),
     ]
     cards = "".join(
@@ -9508,18 +9510,18 @@ def _render_report_visual(match_id: int, meta: dict, payload: dict, report_text:
         ),
         unsafe_allow_html=True,
     )
-    st.markdown('<div class="report-section-title">Graficos complementarios</div>', unsafe_allow_html=True)
+    st.markdown('<div class="report-section-title">Gráficos complementarios</div>', unsafe_allow_html=True)
     c3, c4 = st.columns([1, 1])
     with c3:
         _show_image(match_id, "amenaza_media_cluster.png", "Amenaza media por patron")
     with c4:
-        _show_image(match_id, "causas_danio.png", "Causas del dano")
+        _show_image(match_id, "causas_danio.png", "Causas del daño")
     st.markdown("</div></div>", unsafe_allow_html=True)
 
 
 def render_informe(match_id: int, meta: dict):
     _page_heading("Informe del partido")
-    st.caption("Vista mas visual para cuerpo tecnico: cabecera, escudos, fecha, KPIs, graficos, tablas limpias y texto conciso.")
+    st.caption("Vista más visual para cuerpo técnico: cabecera, escudos, fecha, KPIs, gráficos, tablas limpias y texto conciso.")
 
     report_key = f"ollama_report_{match_id}"
     source_key = f"ollama_report_source_{match_id}"
@@ -9534,7 +9536,7 @@ def render_informe(match_id: int, meta: dict):
     if generate or local:
         if not _ollama_api_key():
             st.warning("No hay clave de Ollama configurada. Se generara una version local.")
-        with st.spinner("Generando informe tactico..."):
+        with st.spinner("Generando informe táctico..."):
             report_text, payload, source = _generate_tactical_report(match_id, meta, use_ollama=generate)
             st.session_state[report_key] = report_text
             st.session_state[source_key] = source
@@ -9550,19 +9552,19 @@ def render_informe(match_id: int, meta: dict):
     payload = st.session_state.get(payload_key) or _report_payload(match_id, meta)
     source = st.session_state.get(source_key, "ollama")
     if source == "ollama":
-        st.success("Informe generado con Ollama. La vista visual usa los datos y graficos del partido.")
+        st.success("Informe generado con Ollama. La vista visual usa los datos y gráficos del partido.")
     else:
         st.info("Informe local generado con reglas deterministas del proyecto.")
 
     _render_report_visual(match_id, meta, payload, report_text)
 
-    pdf_bytes = _markdown_to_pdf_bytes(report_text, title=f"Informe tactico partido {match_id}")
+    pdf_bytes = _markdown_to_pdf_bytes(report_text, title=f"Informe táctico partido {match_id}")
     d1, d2 = st.columns(2)
     with d1:
         st.download_button(
             "Descargar informe en PDF",
             data=pdf_bytes,
-            file_name=f"informe_tactico_{match_id}.pdf",
+            file_name=f"informe_táctico_{match_id}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -9570,12 +9572,12 @@ def render_informe(match_id: int, meta: dict):
         st.download_button(
             "Descargar informe en Markdown",
             data=report_text.encode("utf-8"),
-            file_name=f"informe_tactico_{match_id}.md",
+            file_name=f"informe_táctico_{match_id}.md",
             mime="text/markdown",
             use_container_width=True,
         )
 
-    with st.expander("Ver redaccion completa y JSON enviado al informe"):
+    with st.expander("Ver redacción completa y JSON enviado al informe"):
         st.markdown(report_text)
         st.json(payload)
 
@@ -9712,14 +9714,14 @@ def _report_lines(payload: dict) -> tuple[list[str], list[str]]:
     causes = payload.get("causas_defensivas", [])
     cause = causes[0]["causa"] if causes else "causa defensiva no identificada"
     conclusions = [
-        f"El rival genero {metrics.get('secuencias_rivales', '-')} secuencias evaluables y {metrics.get('tiros', '-')} tiros dentro de secuencia.",
-        f"El patron mas peligroso fue {top_danger}; el que mas desordeno fue {top_ddi}.",
+        f"El rival generó {metrics.get('secuencias_rivales', '-')} secuencias evaluables y {metrics.get('tiros', '-')} tiros dentro de secuencia.",
+        f"El patrón más peligroso fue {top_danger}; el que más desordenó fue {top_ddi}.",
         f"La causa defensiva dominante fue {cause}.",
     ]
     improvements = [
-        f"Revisar en video las secuencias criticas del patron {top_danger}.",
-        f"Ajustar la proteccion de {metrics.get('zona_mas_danada', 'la zona mas danada')} y los intervalos cercanos.",
-        "Reducir distancia al poseedor en progresiones y acelerar reorganizacion tras perdida.",
+        f"Revisar en video las secuencias críticas del patrón {top_danger}.",
+        f"Ajustar la protección de {metrics.get('zona_mas_danada', 'la zona más danada')} y los intervalos cercanos.",
+        "Reducir distancia al poseedor en progresiónes y acelerar reorganizacion tras perdida.",
         "Usar IDD e IPO juntos: no revisar solo las acciones que terminan en tiro.",
     ]
     return conclusions, improvements
@@ -9742,7 +9744,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     buffer = io.BytesIO()
 
     with PdfPages(buffer) as pdf:
-        fig, ax = _pdf_page(f"Informe tactico partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}")
+        fig, ax = _pdf_page(f"Informe táctico partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}")
         _pdf_add_image(fig, _logo_path(teams["home_id"]), (0.09, 0.67, 0.10, 0.13))
         _pdf_add_image(fig, _logo_path(teams["away_id"]), (0.81, 0.67, 0.10, 0.13))
         ax.text(0.22, 0.75, teams["home_name"], transform=ax.transAxes, fontsize=17, weight="bold", color="#111827", ha="left")
@@ -9754,9 +9756,9 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
 
         cards = [
             ("Secuencias", metrics.get("secuencias_rivales")),
-            ("Patron + repetido", _best_pattern(payload, "secuencias")),
-            ("Patron + peligroso", _best_pattern(payload, "ipar_medio")),
-            ("Zona + daÃ±ada", metrics.get("zona_mas_danada")),
+            ("Patrón + repetido", _best_pattern(payload, "secuencias")),
+            ("Patrón + peligroso", _best_pattern(payload, "ipar_medio")),
+            ("Zona + dañada", metrics.get("zona_mas_danada")),
             ("Tramo + atacado", metrics.get("tramo_mas_atacado")),
             ("IDD | IPO | PC", f"{metrics.get('ddi_medio')} | {metrics.get('ipar_medio')} | {metrics.get('pc_rival_medio')}"),
         ]
@@ -9777,38 +9779,38 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("TipologÃ­as de ataque rival", "Mapa territorial, volumen y eficacia por patrÃ³n")
+        fig, ax = _pdf_page("Tipologías de ataque rival", "Mapa territorial, volumen y eficacia por patrón")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("mapa_calor_notebook", "mapa_calor_clusters.png")), (0.07, 0.39, 0.86, 0.36))
         _pdf_table(
             ax,
             clusters_display,
             ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "duracion_media", "zona_dominante", "carril_dominante"],
-            ["TipologÃ­a", "N", "%", "Tiros", "A puerta", "Dur.", "Zona", "Carril"],
+            ["Tipología", "N", "%", "Tiros", "A puerta", "Dur.", "Zona", "Carril"],
             [0.05, 0.11, 0.90, 0.22],
             font_size=7.5,
             max_rows=8,
         )
-        _pdf_text(ax, 0.06, 0.35, f"Lectura: el patrÃ³n mÃ¡s repetido fue {_best_pattern(payload, 'secuencias')} y el de mayor IPO medio fue {_best_pattern(payload, 'ipar_medio')}.", size=9.5, width=120)
+        _pdf_text(ax, 0.06, 0.35, f"Lectura: el patrón más repetido fue {_best_pattern(payload, 'secuencias')} y el de mayor IPO medio fue {_best_pattern(payload, 'ipar_medio')}.", size=9.5, width=120)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("OrganizaciÃ³n defensiva propia", "IDD, IPO, Pitch Control y causas de desorganizaciÃ³n")
+        fig, ax = _pdf_page("Organización defensiva propia", "IDD, IPO, Pitch Control y causas de desorganización")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("matriz_ddi_ipar", "matriz_ddi_ipar.png")), (0.05, 0.43, 0.42, 0.36))
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("causas_danio", "causas_danio.png")), (0.53, 0.43, 0.42, 0.36))
         _pdf_table(
             ax,
             riesgo,
             ["cluster_trayectoria", "secuencias", "ddi_medio", "ipar_medio", "tiros", "tiros_puerta"],
-            ["TipologÃ­a", "N", "IDD med.", "IPO med.", "Tiros", "A puerta"],
+            ["Tipología", "N", "IDD med.", "IPO med.", "Tiros", "A puerta"],
             [0.05, 0.13, 0.90, 0.22],
             font_size=8,
             max_rows=8,
         )
-        _pdf_text(ax, 0.06, 0.38, "La tabla resume quÃ© patrones combinan mÃ¡s desorganizaciÃ³n defensiva y peligrosidad real.", size=9.5, width=120)
+        _pdf_text(ax, 0.06, 0.38, "La tabla resume qué patrones combinan más desorganización defensiva y peligrosidad real.", size=9.5, width=120)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Analisis temporal", "CuÃ¡ndo aparecen las secuencias, la peligrosidad y los tiros")
+        fig, ax = _pdf_page("Análisis temporal", "Cuándo aparecen las secuencias, la peligrosidad y los tiros")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("evolucion_temporal_tiros", "evolucion_temporal_tiros.png")), (0.06, 0.37, 0.88, 0.41))
         temporal = pd.DataFrame(payload.get("analisis_temporal", []))
         _pdf_table(
@@ -9823,7 +9825,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Jugadas criticas y plan de mejora", "Secuencias prioritarias para revisar en video")
+        fig, ax = _pdf_page("Jugadas críticas y plan de mejora", "Secuencias prioritarias para revisar en video")
         _pdf_table(
             ax,
             ranking,
@@ -9851,12 +9853,12 @@ def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
         "Lectura general del informe",
-        "Esta pestaÃ±a genera una salida final lista para presentar. El PDF reÃºne marcador, resumen ejecutivo, tipologÃ­as ofensivas, estructura defensiva, momentum, secuencias prioritarias y lÃ­neas de mejora.",
+        "Esta pestaña genera una salida final lista para presentar. El PDF reúne marcador, resumen ejecutivo, tipologías ofensivas, estructura defensiva, momentum, secuencias prioritarias y líneas de mejora.",
     )
     pdf_key = f"visual_report_pdf_{match_id}"
 
     if st.button("Generar informe", type="primary", use_container_width=True):
-        with st.spinner("Generando PDF del informe tactico..."):
+        with st.spinner("Generando PDF del informe táctico..."):
             try:
                 st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
             except Exception as exc:
@@ -9868,7 +9870,7 @@ def render_informe(match_id: int, meta: dict):
         st.download_button(
             "Descargar informe en PDF",
             data=st.session_state[pdf_key],
-            file_name=f"informe_tactico_{match_id}.pdf",
+            file_name=f"informe_táctico_{match_id}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -9897,7 +9899,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     subtitle = f"{ctx['fecha']} | {ctx['competicion']}"
 
     with PdfPages(buffer) as pdf:
-        fig, ax = _pdf_new_page(f"Informe tactico partido {match_id}", subtitle)
+        fig, ax = _pdf_new_page(f"Informe táctico partido {match_id}", subtitle)
         _pdf_add_image(fig, _logo_path(teams["home_id"]), (0.09, 0.735, 0.12, 0.10))
         _pdf_add_image(fig, _logo_path(teams["away_id"]), (0.79, 0.735, 0.12, 0.10))
         ax.text(0.27, 0.79, teams["home_name"], transform=ax.transAxes, fontsize=14, weight="bold", color="#111827", ha="center")
@@ -9909,8 +9911,8 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         y = _pdf_section(ax, 0.60, "Resumen global")
         cards = [
             ("Secuencias rivales", metrics.get("secuencias_rivales")),
-            ("Patron + repetido", _short_pattern_name(_best_pattern(payload, "secuencias"))),
-            ("Patron + peligroso", _short_pattern_name(_best_pattern(payload, "ipar_medio"))),
+            ("Patrón + repetido", _short_pattern_name(_best_pattern(payload, "secuencias"))),
+            ("Patrón + peligroso", _short_pattern_name(_best_pattern(payload, "ipar_medio"))),
             ("Zona + danada", metrics.get("zona_mas_danada")),
             ("Tramo + atacado", metrics.get("tramo_mas_atacado")),
             ("IDD | IPO | PC", f"{metrics.get('ddi_medio')} | {metrics.get('ipar_medio')} | {metrics.get('pc_rival_medio')}"),
@@ -9921,34 +9923,34 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("TipologÃ­as de ataque rival", "Mapa de calor de las tipologÃ­as y tabla resumen")
+        fig, ax = _pdf_new_page("Tipologías de ataque rival", "Mapa de calor de las tipologías y tabla resumen")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("mapa_calor_notebook", "mapa_calor_clusters.png")), (0.08, 0.56, 0.84, 0.27))
-        y = _pdf_section(ax, 0.50, "Listado de tipologÃ­as")
+        y = _pdf_section(ax, 0.50, "Listado de tipologías")
         tipologias_txt = []
         for _, row in clusters_display.head(8).iterrows():
             name = row.get("tipologia", row.get("cluster_trayectoria", "-"))
             label = row.get("etiqueta_tactica", "")
-            tipologias_txt.append(f"- TipologÃ­a {name}: {_short_pattern_name(label, 70) if label else 'nombre pendiente'}")
+            tipologias_txt.append(f"- Tipología {name}: {_short_pattern_name(label, 70) if label else 'nombre pendiente'}")
         _pdf_wrapped(ax, 0.10, y, "\n".join(tipologias_txt), size=8.8, width=94, line_height=0.017)
         _pdf_clean_table(
             ax,
             clusters_display,
             ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "duracion_media", "zona_dominante", "carril_dominante"],
-            ["TipologÃ­a", "N sec.", "%", "Tiros", "A puerta", "Dur.", "Zona", "Carril"],
+            ["Tipología", "N sec.", "%", "Tiros", "A puerta", "Dur.", "Zona", "Carril"],
             [0.06, 0.10, 0.88, 0.22],
             font_size=6.6,
             max_rows=8,
         )
-        _pdf_wrapped(ax, 0.08, 0.075, "Breve resumen: revisar las tipologÃ­as con mÃ¡s volumen y cruzarlas con tiros, tiros a puerta y zona dominante para priorizar clips.", size=8.7, width=105, line_height=0.016)
+        _pdf_wrapped(ax, 0.08, 0.075, "Breve resumen: revisar las tipologías con más volumen y cruzarlas con tiros, tiros a puerta y zona dominante para priorizar clips.", size=8.7, width=105, line_height=0.016)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("OrganizaciÃ³n defensiva propia", "IDD, IPO, xT y Pitch Control por tipologÃ­a")
+        fig, ax = _pdf_new_page("Organización defensiva propia", "IDD, IPO, xT y Pitch Control por tipología")
         _pdf_clean_table(
             ax,
             pattern_summary,
             ["tipologia", "ddi_medio", "ipar_medio", "ddi_max", "ipar_max", "xt_max", "pc_rival_medio", "pc_zona_peligrosa"],
-            ["TipologÃ­a", "IDD medio", "IPO medio", "IDD max", "IPO max", "xT max", "PC rival", "PC zona pelig."],
+            ["Tipología", "IDD medio", "IPO medio", "IDD max", "IPO max", "xT max", "PC rival", "PC zona pelig."],
             [0.06, 0.58, 0.88, 0.24],
             font_size=6.4,
             max_rows=8,
@@ -9957,21 +9959,21 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ax,
             riesgo,
             ["cluster_trayectoria", "secuencias", "ddi_medio", "ipar_medio", "tiros", "tiros_puerta"],
-            ["TipologÃ­a", "N", "IDD med.", "IPO med.", "Tiros", "A puerta"],
+            ["Tipología", "N", "IDD med.", "IPO med.", "Tiros", "A puerta"],
             [0.06, 0.35, 0.88, 0.15],
             font_size=7.0,
             max_rows=8,
         )
-        _pdf_wrapped(ax, 0.08, 0.29, "Breve resumen: la tabla superior resume el nivel defensivo por tipologÃ­a. La tabla inferior ordena los patrones por combinaciÃ³n de desorganizaciÃ³n, peligrosidad y finalizaciÃ³n.", size=9.2, width=96, line_height=0.019)
+        _pdf_wrapped(ax, 0.08, 0.29, "Breve resumen: la tabla superior resume el nivel defensivo por tipología. La tabla inferior ordena los patrones por combinación de desorganización, peligrosidad y finalización.", size=9.2, width=96, line_height=0.019)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("Secuencias con mayor desorganizaciÃ³n", "Top 5 segÃºn IDD")
+        fig, ax = _pdf_new_page("Secuencias con mayor desorganización", "Top 5 según IDD")
         _pdf_clean_table(
             ax,
             desorg_top,
             ["secuencia_rival_id", "tipologia", "minuto_partido", "duracion_seg", "indice_desorganizacion", "indice_peligrosidad_accion", "tipo_finalizacion_tiro", "tipo_finalizacion_tiro_puerta", "es_gol", "tipo_desorganizacion_principal"],
-            ["ID", "TipologÃ­a", "Min", "DuraciÃ³n", "IDD", "IPO", "Tiro", "A puerta", "Gol", "Causa"],
+            ["ID", "Tipología", "Min", "Duración", "IDD", "IPO", "Tiro", "A puerta", "Gol", "Causa"],
             [0.04, 0.58, 0.92, 0.24],
             font_size=6.3,
             max_rows=5,
@@ -9985,35 +9987,35 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             font_size=7.0,
             max_rows=8,
         )
-        _pdf_wrapped(ax, 0.08, 0.25, "Breve resumen de la secciÃ³n: estas son las acciones donde el equipo queda mÃ¡s desorganizado. Prioridad de revisiÃ³n: estructura de retroceso, anchura entre jugadores y control rival en zonas peligrosas.", size=9.2, width=96, line_height=0.019)
+        _pdf_wrapped(ax, 0.08, 0.25, "Breve resumen de la sección: estas son las acciones donde el equipo queda más desorganizado. Prioridad de revisión: estructura de retroceso, anchura entre jugadores y control rival en zonas peligrosas.", size=9.2, width=96, line_height=0.019)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("Secuencias con mÃ¡s amenaza/peligro", "Top 5 segÃºn IPO")
+        fig, ax = _pdf_new_page("Secuencias con más amenaza/peligro", "Top 5 según IPO")
         _pdf_clean_table(
             ax,
             danger_top,
             ["secuencia_rival_id", "tipologia", "minuto_partido", "duracion_seg", "indice_peligrosidad_accion", "indice_desorganizacion", "xT_max", "tipo_finalizacion_tiro", "tipo_finalizacion_tiro_puerta", "es_gol"],
-            ["ID", "TipologÃ­a", "Min", "DuraciÃ³n", "IPO", "IDD", "xT max", "Tiro", "A puerta", "Gol"],
+            ["ID", "Tipología", "Min", "Duración", "IPO", "IDD", "xT max", "Tiro", "A puerta", "Gol"],
             [0.04, 0.58, 0.92, 0.24],
             font_size=6.3,
             max_rows=5,
         )
-        y = _pdf_section(ax, 0.48, "Jugadas crÃ­ticas prioritarias")
+        y = _pdf_section(ax, 0.48, "Jugadas críticas prioritarias")
         _pdf_clean_table(
             ax,
             seq_sorted,
             ["secuencia_rival_id", "tipologia", "minuto_partido", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "tipo_finalizacion_tiro", "tipo_finalizacion_tiro_puerta", "es_gol"],
-            ["ID", "TipologÃ­a", "Min", "Crit.", "IDD", "IPO", "Tiro", "A puerta", "Gol"],
+            ["ID", "Tipología", "Min", "Crit.", "IDD", "IPO", "Tiro", "A puerta", "Gol"],
             [0.06, 0.25, 0.88, 0.17],
             font_size=6.8,
             max_rows=3,
         )
-        _pdf_wrapped(ax, 0.08, 0.20, "SelecciÃ³n: las 3 jugadas cruzan desorganizaciÃ³n y peligrosidad mÃ¡xima. Sirven para analizar una a una el minuto, la tipologÃ­a, el resultado de la acciÃ³n y la causa principal.", size=9.1, width=96, line_height=0.018)
+        _pdf_wrapped(ax, 0.08, 0.20, "Selección: las 3 jugadas cruzan desorganización y peligrosidad máxima. Sirven para analizar una a una el minuto, la tipología, el resultado de la acción y la causa principal.", size=9.1, width=96, line_height=0.018)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_new_page("Conclusiones y lineas de mejora", "Sintesis final para cuerpo tecnico")
+        fig, ax = _pdf_new_page("Conclusiones y líneas de mejora", "Síntesis final para cuerpo técnico")
         y = _pdf_section(ax, 0.78, "Conclusiones")
         for line in conclusions:
             y = _pdf_wrapped(ax, 0.10, y, f"- {line}", size=9.6, width=94, line_height=0.020)
@@ -10032,7 +10034,7 @@ def _coach_report_fallback(payload: dict) -> dict[str, str]:
     executive = payload.get("resumen_ejecutivo", {})
     tipologias = payload.get("tipologias", [])
     causes = payload.get("causas_defensivas", [])
-    critical = payload.get("secuencias_criticas", [])
+    critical = payload.get("secuencias_críticas", [])
     top_freq = max(tipologias, key=lambda x: x.get("secuencias", 0), default={})
     top_danger = max(tipologias, key=lambda x: x.get("ipar_medio") or 0, default={})
     top_ddi = max(tipologias, key=lambda x: x.get("ddi_medio") or 0, default={})
@@ -10045,38 +10047,38 @@ def _coach_report_fallback(payload: dict) -> dict[str, str]:
     top_seq_score = _fmt_report_value(top_seq.get("score_critico"))
     return {
         "resumen_ejecutivo": (
-            f"El rival generÃ³ {metrics.get('secuencias_rivales', '-')} secuencias ofensivas, "
+            f"El rival generó {metrics.get('secuencias_rivales', '-')} secuencias ofensivas, "
             f"{metrics.get('tiros', '-')} tiros y {metrics.get('tiros_puerta', '-')} remates a puerta. "
             f"La prioridad del informe es cruzar volumen, IDD e IPO para no quedarse solo con el resultado final. "
-            f"La secuencia prioritaria para vÃ­deo es la {top_seq_id}, minuto {top_seq_min}, con prioridad {top_seq_score}."
+            f"La secuencia prioritaria para vídeo es la {top_seq_id}, minuto {top_seq_min}, con prioridad {top_seq_score}."
         ),
         "tipologia_destacada": (
-            f"La tipologÃ­a mÃ¡s repetida fue {_short_pattern_name(top_freq.get('tipologia', '-'), 90)} "
-            f"({top_freq.get('secuencias', '-')} secuencias). La tipologÃ­a con mayor amenaza media fue "
+            f"La tipología más repetida fue {_short_pattern_name(top_freq.get('tipologia', '-'), 90)} "
+            f"({top_freq.get('secuencias', '-')} secuencias). La tipología con mayor amenaza media fue "
             f"{_short_pattern_name(top_danger.get('tipologia', '-'), 90)} con IPO medio {top_danger.get('ipar_medio', '-')}. "
-            "Para el cuerpo tÃ©cnico, esto separa lo que el rival repite de lo que realmente castiga."
+            "Para el cuerpo técnico, esto separa lo que el rival repite de lo que realmente castiga."
         ),
         "estructura_defensiva": (
-            f"El patrÃ³n que mÃ¡s desorganizÃ³ al bloque fue {_short_pattern_name(top_ddi.get('tipologia', '-'), 90)} "
+            f"El patrón que más desorganizó al bloque fue {_short_pattern_name(top_ddi.get('tipologia', '-'), 90)} "
             f"con IDD medio {top_ddi.get('ddi_medio', '-')}. La causa dominante registrada fue {cause}. "
-            "La recomendaciÃ³n es revisar distancias entre lÃ­neas, protecciÃ³n de espalda y orientaciÃ³n de la presiÃ³n "
+            "La recomendación es revisar distancias entre líneas, protección de espalda y orientación de la presión "
             "en los momentos en los que el rival progresa hacia zona de remate."
         ),
-        "secuencias_criticas": (
-            f"Las secuencias prioritarias son {crit_txt}. Deben revisarse en vÃ­deo porque combinan IDD, IPO, xT, "
-            "Pitch Control rival o finalizaciÃ³n. La lectura no debe limitarse a si hubo gol: una acciÃ³n sin gol puede ser "
-            "mÃ¡s valiosa para corregir si muestra una ruptura repetible de la estructura defensiva."
+        "secuencias_críticas": (
+            f"Las secuencias prioritarias son {crit_txt}. Deben revisarse en vídeo porque combinan IDD, IPO, xT, "
+            "Pitch Control rival o finalización. La lectura no debe limitarse a si hubo gol: una acción sin gol puede ser "
+            "más valiosa para corregir si muestra una ruptura repetible de la estructura defensiva."
         ),
         "momentum_critico": (
-            f"El tramo crÃ­tico detectado fue {momentum.get('tramo', metrics.get('tramo_mas_atacado', '-'))}, "
-            f"con Ã­ndice temporal {momentum.get('indice_temporal', '-')} y {momentum.get('secuencias', '-')} secuencias. "
+            f"El tramo crítico detectado fue {momentum.get('tramo', metrics.get('tramo_mas_atacado', '-'))}, "
+            f"con índice temporal {momentum.get('indice_temporal', '-')} y {momentum.get('secuencias', '-')} secuencias. "
             "Este tramo concentra volumen, amenaza y desorden defensivo; por eso conviene analizarlo como bloque de partido "
             "y no como acciones aisladas."
         ),
         "recomendaciones_globales": (
-            f"Priorizar vÃ­deo de {_short_pattern_name(top_danger.get('tipologia', '-'), 90)} y de las secuencias {crit_txt}. "
-            f"Proteger {metrics.get('zona_mas_danada', 'la zona mÃ¡s daÃ±ada')} con mejores coberturas y reducir tiempo al poseedor. "
-            "El plan de mejora debe centrarse en las causas repetidas, el tramo crÃ­tico y las secuencias que combinan amenaza y desorganizaciÃ³n."
+            f"Priorizar vídeo de {_short_pattern_name(top_danger.get('tipologia', '-'), 90)} y de las secuencias {crit_txt}. "
+            f"Proteger {metrics.get('zona_mas_danada', 'la zona más dañada')} con mejores coberturas y reducir tiempo al poseedor. "
+            "El plan de mejora debe centrarse en las causas repetidas, el tramo crítico y las secuencias que combinan amenaza y desorganización."
         ),
     }
 
@@ -10087,12 +10089,12 @@ def _coach_report_sections(payload: dict) -> dict[str, str]:
     if not api_key:
         return fallback
     prompt = (
-        "Eres analista tÃ¡ctico profesional para un cuerpo tÃ©cnico de fÃºtbol. "
-        "Redacta un informe final muy prÃ¡ctico, no acadÃ©mico, usando solo el JSON. "
-        "No inventes datos ni nombres. Devuelve SOLO JSON vÃ¡lido con estas claves exactas: "
-        "resumen_ejecutivo, tipologia_destacada, estructura_defensiva, secuencias_criticas, momentum_critico, recomendaciones_globales. "
-        "Cada clave debe contener entre 3 y 5 frases breves, con lectura tÃ¡ctica y recomendaciÃ³n accionable. "
-        "Prioriza lo que debe quedarse un entrenador: patrones principales, secuencias de vÃ­deo, tramo crÃ­tico y correcciones.\n\n"
+        "Eres analista táctico profesional para un cuerpo técnico de fútbol. "
+        "Redacta un informe final muy práctico, no académico, usando solo el JSON. "
+        "No inventes datos ni nombres. Devuelve SOLO JSON válido con estas claves exactas: "
+        "resumen_ejecutivo, tipologia_destacada, estructura_defensiva, secuencias_críticas, momentum_critico, recomendaciones_globales. "
+        "Cada clave debe contener entre 3 y 5 frases breves, con lectura táctica y recomendación accionable. "
+        "Prioriza lo que debe quedarse un entrenador: patrones principales, secuencias de vídeo, tramo crítico y correcciones.\n\n"
         f"JSON:\n{json.dumps(payload, ensure_ascii=False)}"
     )
     try:
@@ -10272,7 +10274,7 @@ def _render_coach_report_preview(match_id: int, meta: dict, payload: dict, analy
     metrics = payload.get("metricas_globales", {})
     executive = payload.get("resumen_ejecutivo", {})
     momentum = payload.get("momentum_critico", {})
-    top_seq = payload.get("secuencias_criticas", [{}])[0] if payload.get("secuencias_criticas") else {}
+    top_seq = payload.get("secuencias_críticas", [{}])[0] if payload.get("secuencias_críticas") else {}
     top_seq_detail = (
         f"Min. {_fmt_report_value(top_seq.get('minuto_partido'), 1)} | "
         f"IDD {_fmt_report_value(top_seq.get('indice_desorganizacion'))} | "
@@ -10284,23 +10286,23 @@ def _render_coach_report_preview(match_id: int, meta: dict, payload: dict, analy
         <div class="coach-report-layout">
             <div class="coach-report-top">
                 <div>
-                    <h3>Informe ejecutivo para cuerpo tÃ©cnico</h3>
+                    <h3>Informe ejecutivo para cuerpo técnico</h3>
                     <p>Resumen operativo del partido {int(match_id)}: solo aparecen los patrones, momentos y secuencias que conviene revisar primero.</p>
                 </div>
-                <div class="coach-report-engine">RedacciÃ³n: {html.escape(_coach_report_source_label())}</div>
+                <div class="coach-report-engine">Redacción: {html.escape(_coach_report_source_label())}</div>
             </div>
             <div class="coach-report-grid">
-                {_coach_card_html("TipologÃ­a mÃ¡s repetida", executive.get("tipologia_mas_repetida", "-"), f'{metrics.get("secuencias_rivales", "-")} secuencias rivales totales')}
-                {_coach_card_html("TipologÃ­a mÃ¡s peligrosa", executive.get("tipologia_mas_peligrosa", "-"), f'IPO medio global {metrics.get("ipar_medio", "-")}')}
+                {_coach_card_html("Tipología más repetida", executive.get("tipologia_mas_repetida", "-"), f'{metrics.get("secuencias_rivales", "-")} secuencias rivales totales')}
+                {_coach_card_html("Tipología más peligrosa", executive.get("tipologia_mas_peligrosa", "-"), f'IPO medio global {metrics.get("ipar_medio", "-")}')}
                 {_coach_card_html("Secuencia prioritaria", executive.get("secuencia_prioritaria", "-"), top_seq_detail)}
-                {_coach_card_html("Momentum crÃ­tico", momentum.get("tramo", executive.get("momento_critico", "-")), f'Ãndice temporal {momentum.get("indice_temporal", "-")}')}
+                {_coach_card_html("Momentum crítico", momentum.get("tramo", executive.get("momento_critico", "-")), f'Índice temporal {momentum.get("indice_temporal", "-")}')}
             </div>
             <div class="coach-report-sections">
                 {_coach_section_html("Resumen ejecutivo", analysis.get("resumen_ejecutivo", ""))}
-                {_coach_section_html("TipologÃ­a destacada", analysis.get("tipologia_destacada", ""))}
+                {_coach_section_html("Tipología destacada", analysis.get("tipologia_destacada", ""))}
                 {_coach_section_html("Estructura defensiva", analysis.get("estructura_defensiva", ""))}
-                {_coach_section_html("Secuencias crÃ­ticas", analysis.get("secuencias_criticas", ""))}
-                {_coach_section_html("Momentum crÃ­tico", analysis.get("momentum_critico", ""))}
+                {_coach_section_html("Secuencias críticas", analysis.get("secuencias_críticas", ""))}
+                {_coach_section_html("Momentum crítico", analysis.get("momentum_critico", ""))}
                 {_coach_section_html("Recomendaciones globales", analysis.get("recomendaciones_globales", ""))}
             </div>
         </div>
@@ -10308,19 +10310,19 @@ def _render_coach_report_preview(match_id: int, meta: dict, payload: dict, analy
         unsafe_allow_html=True,
     )
 
-    st.markdown("### GrÃ¡ficas clave del informe")
+    st.markdown("### Gráficas clave del informe")
     c1, c2 = st.columns([1, 1])
     with c1:
-        _show_image(match_id, "mapa_calor_clusters.png", "Mapa de calor global de tipologÃ­as")
+        _show_image(match_id, "mapa_calor_clusters.png", "Mapa de calor global de tipologías")
     with c2:
         _show_image(match_id, "evolucion_temporal_tiros.png", "Momentum, amenaza y tiros por tramo")
     c3, c4 = st.columns([1, 1])
     with c3:
-        _show_image(match_id, "matriz_ddi_ipar.png", "RelaciÃ³n IDD/IPO por secuencia")
+        _show_image(match_id, "matriz_ddi_ipar.png", "Relación IDD/IPO por secuencia")
     with c4:
-        _show_image(match_id, "ranking_secuencias.png", "Ranking de secuencias crÃ­ticas")
+        _show_image(match_id, "ranking_secuencias.png", "Ranking de secuencias críticas")
 
-    st.markdown("### Secuencias para revisar en vÃ­deo")
+    st.markdown("### Secuencias para revisar en vídeo")
     table_cols = [
         "secuencia_rival_id",
         "minuto_partido",
@@ -10336,7 +10338,7 @@ def _render_coach_report_preview(match_id: int, meta: dict, payload: dict, analy
     labels = {
         "secuencia_rival_id": "Seq.",
         "minuto_partido": "Min.",
-        "tipologia": "TipologÃ­a",
+        "tipologia": "Tipología",
         "score_critico": "Prioridad",
         "indice_desorganizacion": "IDD",
         "indice_peligrosidad_accion": "IPO",
@@ -10347,7 +10349,7 @@ def _render_coach_report_preview(match_id: int, meta: dict, payload: dict, analy
     }
     tabs = st.tabs(["Combinada", "IDD", "IPO"])
     with tabs[0]:
-        st.markdown(_report_table_html(_report_records_df(payload, "secuencias_criticas"), table_cols, labels, n=5), unsafe_allow_html=True)
+        st.markdown(_report_table_html(_report_records_df(payload, "secuencias_críticas"), table_cols, labels, n=5), unsafe_allow_html=True)
     with tabs[1]:
         st.markdown(_report_table_html(_report_records_df(payload, "secuencias_top_idd"), table_cols, labels, n=5), unsafe_allow_html=True)
     with tabs[2]:
@@ -10404,7 +10406,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     riesgo = _load_table(match_id, meta["tables"].get("riesgo_resumen", "riesgo_resumen.csv"))
     ranking = _load_table(match_id, meta["tables"].get("ranking_secuencias", "ranking_secuencias.csv"))
     temporal = pd.DataFrame(payload.get("analisis_temporal", []))
-    top_combined = _report_records_df(payload, "secuencias_criticas")
+    top_combined = _report_records_df(payload, "secuencias_críticas")
     top_idd = _report_records_df(payload, "secuencias_top_idd")
     top_ipo = _report_records_df(payload, "secuencias_top_ipo")
     ctx = _match_report_context(match_id, meta)
@@ -10425,10 +10427,10 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         cards = [
             ("Secuencias", metrics.get("secuencias_rivales")),
             ("Tiros / puerta", f"{metrics.get('tiros')} / {metrics.get('tiros_puerta')}"),
-            ("Tipologia repetida", executive.get("tipologia_mas_repetida", "-")),
-            ("Tipologia peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
+            ("Tipología repetida", executive.get("tipologia_mas_repetida", "-")),
+            ("Tipología peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
             ("Secuencia video", executive.get("secuencia_prioritaria", "-")),
-            ("Momentum critico", momentum.get("tramo", executive.get("momento_critico", "-"))),
+            ("Momentum crítico", momentum.get("tramo", executive.get("momento_critico", "-"))),
         ]
         for idx, (label, value) in enumerate(cards):
             _metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.47 - (idx // 3) * 0.13, 0.265, 0.095, label, _short_pattern_name(value, 36))
@@ -10437,14 +10439,14 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Tipologia ofensiva rival destacada", "Volumen, zonas de ataque y amenaza generada")
+        fig, ax = _pdf_page("Tipología ofensiva rival destacada", "Volumen, zonas de ataque y amenaza generada")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("mapa_calor_notebook", "mapa_calor_clusters.png")), (0.05, 0.39, 0.44, 0.37))
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("trayectorias_cluster", "trayectorias_cluster.png")), (0.53, 0.39, 0.42, 0.37))
         _pdf_table(
             ax,
             clusters_display,
             ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "zona_dominante", "carril_dominante"],
-            ["Tipologia", "N", "%", "Tiros", "A puerta", "Zona", "Carril"],
+            ["Tipología", "N", "%", "Tiros", "A puerta", "Zona", "Carril"],
             [0.05, 0.10, 0.90, 0.20],
             font_size=7.4,
             max_rows=8,
@@ -10469,7 +10471,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Momentum critico", "Tramo de partido que debe revisar primero el cuerpo tecnico")
+        fig, ax = _pdf_page("Momentum crítico", "Tramo de partido que debe revisar primero el cuerpo técnico")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("evolucion_temporal_tiros", "evolucion_temporal_tiros.png")), (0.06, 0.39, 0.88, 0.36))
         _pdf_table(
             ax,
@@ -10492,7 +10494,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Secuencias criticas", "Top de jugadas para ver en video")
+        fig, ax = _pdf_page("Secuencias críticas", "Top de jugadas para ver en video")
         _pdf_add_image(fig, _asset(match_id, meta["figures"].get("ranking_secuencias", "ranking_secuencias.png")), (0.05, 0.46, 0.40, 0.28))
         if not top_combined.empty:
             ids = top_combined["secuencia_rival_id"].head(2).tolist()
@@ -10503,17 +10505,17 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ax,
             top_combined,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max", "causa_tactica"],
-            ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT", "Causa"],
+            ["ID", "Min", "Tipología", "Prior.", "IDD", "IPO", "xT", "Causa"],
             [0.05, 0.13, 0.90, 0.23],
             font_size=7.1,
             max_rows=5,
         )
-        _pdf_text(ax, 0.06, 0.39, analysis["secuencias_criticas"], size=9.2, width=122, line_height=0.023)
+        _pdf_text(ax, 0.06, 0.39, analysis["secuencias_críticas"], size=9.2, width=122, line_height=0.023)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Recomendaciones tacticas", "Sintesis final y prioridades de trabajo")
-        _pdf_text(ax, 0.07, 0.76, "Prioridad 1 - Tipologia rival", size=13, weight="bold", color="#c8102e")
+        fig, ax = _pdf_page("Recomendaciones tácticas", "Síntesis final y prioridades de trabajo")
+        _pdf_text(ax, 0.07, 0.76, "Prioridad 1 - Tipología rival", size=13, weight="bold", color="#c8102e")
         _pdf_text(ax, 0.07, 0.71, analysis["tipologia_destacada"], size=10, width=58, line_height=0.026)
         _pdf_text(ax, 0.53, 0.76, "Prioridad 2 - Bloque defensivo", size=13, weight="bold", color="#c8102e")
         _pdf_text(ax, 0.53, 0.71, analysis["estructura_defensiva"], size=10, width=58, line_height=0.026)
@@ -10549,7 +10551,7 @@ def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
         "Lectura ejecutiva del informe",
-        "Salida final pensada para entrenador: tipologia destacada, secuencias prioritarias, momentum critico, graficas clave y recomendaciones tacticas accionables.",
+        "Salida final pensada para entrenador: tipologia destacada, secuencias prioritarias, momentum crítico, gráficas clave y recomendaciones tácticas accionables.",
     )
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
@@ -10569,7 +10571,7 @@ def render_informe(match_id: int, meta: dict):
                 st.session_state.pop(pdf_key, None)
     with c2:
         if st.button("Generar PDF profesional", use_container_width=True):
-            with st.spinner("Montando informe PDF con graficas y recomendaciones..."):
+            with st.spinner("Montando informe PDF con gráficas y recomendaciones..."):
                 try:
                     st.session_state[pdf_key] = _build_visual_report_pdf(match_id, meta)
                 except Exception as exc:
@@ -10612,7 +10614,7 @@ def _ollama_model() -> str:
 
 def _extract_report_json(raw_text: str) -> dict:
     text = str(raw_text or "").strip()
-    text = re.sub(r"^```(?:json)?", "", text, flags=re.IGNORECASE).strip()
+    text = re.sub(r"^```(:json)", "", text, flags=re.IGNORECASE).strip()
     text = re.sub(r"```$", "", text).strip()
     candidates = [text]
     start = text.find("{")
@@ -10651,13 +10653,13 @@ def _coach_report_sections(payload: dict) -> dict[str, str]:
     fallback = _coach_report_fallback(payload)
     required = list(fallback.keys())
     prompt = (
-        "Eres analista tactico profesional para un cuerpo tecnico de futbol. "
+        "Eres analista táctico profesional para un cuerpo técnico de fútbol. "
         "Redacta un informe final breve, profesional y accionable usando solo el JSON. "
         "No inventes datos, jugadores ni clips. Devuelve un objeto JSON puro, sin markdown ni texto alrededor, "
         "con estas claves exactas: "
         + ", ".join(required)
-        + ". Cada clave debe tener entre 3 y 5 frases utiles para un entrenador. "
-        "Prioriza solo lo mas importante: tipologia destacada, secuencias criticas, momentum critico, "
+        + ". Cada clave debe tener entre 3 y 5 frases útiles para un entrenador. "
+        "Prioriza solo lo más importante: tipologia destacada, secuencias críticas, momentum crítico, "
         "estructura defensiva y recomendaciones. No uses tablas ni introducciones generales.\n\n"
         f"JSON:\n{json.dumps(payload, ensure_ascii=False)}"
     )
@@ -10681,7 +10683,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     riesgo = _load_table(match_id, meta["tables"].get("riesgo_resumen", "riesgo_resumen.csv"))
     ranking = _load_table(match_id, meta["tables"].get("ranking_secuencias", "ranking_secuencias.csv"))
     temporal = pd.DataFrame(payload.get("analisis_temporal", []))
-    top_combined = _report_records_df(payload, "secuencias_criticas")
+    top_combined = _report_records_df(payload, "secuencias_críticas")
     top_idd = _report_records_df(payload, "secuencias_top_idd")
     top_ipo = _report_records_df(payload, "secuencias_top_ipo")
     ctx = _match_report_context(match_id, meta)
@@ -10696,7 +10698,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     buffer = io.BytesIO()
 
     with PdfPages(buffer) as pdf:
-        fig, ax = _pdf_page(f"Informe tactico partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}")
+        fig, ax = _pdf_page(f"Informe táctico partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}")
         _pdf_add_image(fig, _logo_path(teams["home_id"]), (0.075, 0.64, 0.10, 0.14))
         _pdf_add_image(fig, _logo_path(teams["away_id"]), (0.825, 0.64, 0.10, 0.14))
         ax.text(0.20, 0.73, teams["home_name"], transform=ax.transAxes, fontsize=16, weight="bold", color="#111827", ha="left")
@@ -10705,10 +10707,10 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         cards = [
             ("Secuencias", metrics.get("secuencias_rivales")),
             ("Tiros / puerta", f"{metrics.get('tiros')} / {metrics.get('tiros_puerta')}"),
-            ("Tipologia repetida", executive.get("tipologia_mas_repetida", "-")),
-            ("Tipologia peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
+            ("Tipología repetida", executive.get("tipologia_mas_repetida", "-")),
+            ("Tipología peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
             ("Secuencia video", executive.get("secuencia_prioritaria", "-")),
-            ("Momentum critico", momentum.get("tramo", executive.get("momento_critico", "-"))),
+            ("Momentum crítico", momentum.get("tramo", executive.get("momento_critico", "-"))),
         ]
         for idx, (label, value) in enumerate(cards):
             _metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.47 - (idx // 3) * 0.13, 0.265, 0.095, label, _short_pattern_name(value, 36))
@@ -10717,14 +10719,14 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Tipologia ofensiva rival", "Graficos ya disponibles en la pagina web")
+        fig, ax = _pdf_page("Tipología ofensiva rival", "Gráficos ya disponibles en la página web")
         _pdf_add_image(fig, _asset(match_id, figs.get("trayectorias_cluster", "trayectorias_cluster.png")), (0.05, 0.46, 0.42, 0.29))
         _pdf_add_image(fig, _asset(match_id, figs.get("mapa_calor_notebook", "mapa_calor_clusters.png")), (0.53, 0.46, 0.42, 0.29))
         _pdf_table(
             ax,
             clusters_display,
             ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "zona_dominante", "carril_dominante"],
-            ["Tipologia", "N", "%", "Tiros", "A puerta", "Zona", "Carril"],
+            ["Tipología", "N", "%", "Tiros", "A puerta", "Zona", "Carril"],
             [0.05, 0.10, 0.90, 0.20],
             font_size=7.4,
             max_rows=8,
@@ -10749,7 +10751,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Momentum critico", "Evolucion temporal del partido")
+        fig, ax = _pdf_page("Momentum crítico", "Evolucion temporal del partido")
         _pdf_add_image(fig, _asset(match_id, figs.get("evolucion_temporal_tiros", "evolucion_temporal_tiros.png")), (0.06, 0.40, 0.88, 0.35))
         _pdf_table(
             ax,
@@ -10772,23 +10774,23 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Secuencias criticas", "Ranking y acciones prioritarias")
+        fig, ax = _pdf_page("Secuencias críticas", "Ranking y acciones prioritarias")
         _pdf_add_image(fig, _asset(match_id, figs.get("ranking_secuencias", "ranking_secuencias.png")), (0.06, 0.47, 0.88, 0.27))
         _pdf_table(
             ax,
             top_combined,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max", "causa_tactica"],
-            ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT", "Causa"],
+            ["ID", "Min", "Tipología", "Prior.", "IDD", "IPO", "xT", "Causa"],
             [0.05, 0.12, 0.90, 0.22],
             font_size=7.1,
             max_rows=5,
         )
-        _pdf_text(ax, 0.06, 0.39, analysis["secuencias_criticas"], size=9.2, width=122, line_height=0.023)
+        _pdf_text(ax, 0.06, 0.39, analysis["secuencias_críticas"], size=9.2, width=122, line_height=0.023)
         pdf.savefig(fig, bbox_inches="tight")
         plt.close(fig)
 
-        fig, ax = _pdf_page("Recomendaciones tacticas", "Sintesis final")
-        _pdf_text(ax, 0.07, 0.74, "Prioridad 1 - Tipologia rival", size=13, weight="bold", color="#c8102e")
+        fig, ax = _pdf_page("Recomendaciones tácticas", "Síntesis final")
+        _pdf_text(ax, 0.07, 0.74, "Prioridad 1 - Tipología rival", size=13, weight="bold", color="#c8102e")
         _pdf_text(ax, 0.07, 0.69, analysis["tipologia_destacada"], size=10, width=58, line_height=0.026)
         _pdf_text(ax, 0.53, 0.74, "Prioridad 2 - Bloque defensivo", size=13, weight="bold", color="#c8102e")
         _pdf_text(ax, 0.53, 0.69, analysis["estructura_defensiva"], size=10, width=58, line_height=0.026)
@@ -10824,7 +10826,7 @@ def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
         "Informe final local",
-        "Genera un PDF profesional para entrenador con las conclusiones principales del analisis y solo con graficos ya presentes en la pagina web.",
+        "Genera un PDF profesional para entrenador con las conclusiones principales del análisis y solo con gráficos ya presentes en la página web.",
     )
     pdf_key = f"ollama_only_report_pdf_{match_id}"
 
@@ -10841,7 +10843,7 @@ def render_informe(match_id: int, meta: dict):
         st.download_button(
             "Descargar informe en PDF",
             data=st.session_state[pdf_key],
-            file_name=f"informe_tactico_{match_id}.pdf",
+            file_name=f"informe_táctico_{match_id}.pdf",
             mime="application/pdf",
             use_container_width=True,
         )
@@ -11039,12 +11041,12 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
         raise RuntimeError(payload["error"])
-    analysis = _coach_report_fallback(payload)
+    analysis = {key: _display_text(value) for key, value in _coach_report_fallback(payload).items()}
 
     _, clusters, _, _ = _prepare_app_data(match_id, meta)
     clusters_display = _clusters_for_display(clusters)
     temporal = pd.DataFrame(payload.get("analisis_temporal", []))
-    top_combined = _report_records_df(payload, "secuencias_criticas")
+    top_combined = _report_records_df(payload, "secuencias_críticas")
     top_idd = _report_records_df(payload, "secuencias_top_idd")
     top_ipo = _report_records_df(payload, "secuencias_top_ipo")
     causes = pd.DataFrame(payload.get("causas_defensivas", []))
@@ -11061,7 +11063,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
     total_pages = 6
 
     with PdfPages(buffer) as pdf:
-        fig, ax = _elite_pdf_page(f"Informe tactico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
+        fig, ax = _elite_pdf_page(f"Informe táctico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
         _elite_pdf_panel(ax, 0.07, 0.62, 0.86, 0.155, face="#ffffff")
         _elite_pdf_logo(fig, _logo_path(teams["home_id"]), (0.095, 0.646, 0.07, 0.09))
         _elite_pdf_logo(fig, _logo_path(teams["away_id"]), (0.835, 0.646, 0.07, 0.09))
@@ -11072,10 +11074,10 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         cards = [
             ("Secuencias", metrics.get("secuencias_rivales")),
             ("Tiros / puerta", f"{metrics.get('tiros', '-')} / {metrics.get('tiros_puerta', '-')}"),
-            ("Tipologia repetida", executive.get("tipologia_mas_repetida", "-")),
-            ("Tipologia peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
+            ("Tipología repetida", executive.get("tipologia_mas_repetida", "-")),
+            ("Tipología peligrosa", executive.get("tipologia_mas_peligrosa", "-")),
             ("Secuencia prioritaria", executive.get("secuencia_prioritaria", "-")),
-            ("Momentum critico", momentum.get("tramo", executive.get("momento_critico", "-"))),
+            ("Momentum crítico", momentum.get("tramo", executive.get("momento_critico", "-"))),
         ]
         for idx, (label, value) in enumerate(cards):
             _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.465 - (idx // 3) * 0.112, 0.26, 0.084, label, value)
@@ -11083,7 +11085,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Tipologia ofensiva rival", "Trayectorias y mapas de calor ya presentes en la pagina web", 2, total_pages)
+        fig, ax = _elite_pdf_page("Tipología ofensiva rival", "Trayectorias y mapas de calor ya presentes en la página web", 2, total_pages)
         _elite_pdf_add_image(
             fig,
             ax,
@@ -11102,7 +11104,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ax,
             clusters_display,
             ["tipologia", "secuencias", "porcentaje", "tiros", "tiros_puerta", "zona_dominante"],
-            ["Tipologia", "N", "%", "Tiros", "A puerta", "Zona"],
+            ["Tipología", "N", "%", "Tiros", "A puerta", "Zona"],
             [0.07, 0.285, 0.86, 0.125],
             font_size=7.1,
             max_rows=4,
@@ -11118,7 +11120,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ("IPO medio", metrics.get("ipar_medio", "-")),
             ("IPO maximo", metrics.get("ipar_max", "-")),
             ("Pitch control rival", metrics.get("pc_rival_medio", "-")),
-            ("Zona mas daÃ±ada", metrics.get("zona_mas_danada", "-")),
+            ("Zona más dañada", metrics.get("zona_mas_danada", "-")),
         ]
         for idx, (label, value) in enumerate(defensive_cards):
             _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.67 - (idx // 3) * 0.11, 0.26, 0.082, label, value)
@@ -11135,7 +11137,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ax,
             clusters_display,
             ["tipologia", "ddi_medio", "ipar_medio", "tiros", "zona_dominante"],
-            ["Tipologia", "IDD", "IPO", "Tiros", "Zona"],
+            ["Tipología", "IDD", "IPO", "Tiros", "Zona"],
             [0.53, 0.37, 0.40, 0.13],
             font_size=7.0,
             max_rows=4,
@@ -11144,10 +11146,10 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Momentum critico", "Tramo temporal que concentra mayor prioridad defensiva", 4, total_pages)
+        fig, ax = _elite_pdf_page("Momentum crítico", "Tramo temporal que concentra mayor prioridad defensiva", 4, total_pages)
         momentum_cards = [
             ("Tramo", momentum.get("tramo", "-")),
-            ("Indice temporal", momentum.get("indice_temporal", "-")),
+            ("Índice temporal", momentum.get("indice_temporal", "-")),
             ("Secuencias", momentum.get("secuencias", "-")),
             ("Tiros", momentum.get("tiros", "-")),
             ("IDD medio", momentum.get("idd_medio", "-")),
@@ -11169,12 +11171,12 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Secuencias criticas", "Top de acciones que debe revisar primero el cuerpo tecnico", 5, total_pages)
+        fig, ax = _elite_pdf_page("Secuencias críticas", "Top de acciones que debe revisar primero el cuerpo técnico", 5, total_pages)
         _elite_pdf_table(
             ax,
             top_combined,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max"],
-            ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT"],
+            ["ID", "Min", "Tipología", "Prior.", "IDD", "IPO", "xT"],
             [0.07, 0.61, 0.86, 0.15],
             font_size=7.1,
             max_rows=5,
@@ -11183,7 +11185,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ax,
             top_idd,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_desorganizacion", "indice_peligrosidad_accion"],
-            ["ID", "Min", "Tipologia", "IDD", "IPO"],
+            ["ID", "Min", "Tipología", "IDD", "IPO"],
             [0.07, 0.405, 0.40, 0.13],
             font_size=6.8,
             max_rows=5,
@@ -11192,7 +11194,7 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
             ax,
             top_ipo,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_peligrosidad_accion", "indice_desorganizacion"],
-            ["ID", "Min", "Tipologia", "IPO", "IDD"],
+            ["ID", "Min", "Tipología", "IPO", "IDD"],
             [0.53, 0.405, 0.40, 0.13],
             font_size=6.8,
             max_rows=5,
@@ -11200,14 +11202,14 @@ def _build_visual_report_pdf(match_id: int, meta: dict) -> bytes:
         ax.text(0.07, 0.555, "Prioridad combinada", transform=ax.transAxes, fontsize=11, weight="bold", color=PDF_NAVY, va="top")
         ax.text(0.07, 0.355, "Top IDD", transform=ax.transAxes, fontsize=11, weight="bold", color=PDF_NAVY, va="top")
         ax.text(0.53, 0.355, "Top IPO", transform=ax.transAxes, fontsize=11, weight="bold", color=PDF_NAVY, va="top")
-        _elite_pdf_text_panel(ax, 0.07, 0.10, 0.86, 0.18, "Conclusiones sobre secuencias", analysis["secuencias_criticas"], max_lines=6)
+        _elite_pdf_text_panel(ax, 0.07, 0.10, 0.86, 0.18, "Conclusiones sobre secuencias", analysis["secuencias_críticas"], max_lines=6)
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Recomendaciones tacticas", "Sintesis final accionable", 6, total_pages)
-        _elite_pdf_text_panel(ax, 0.07, 0.52, 0.40, 0.24, "Prioridad 1 - Tipologia rival", analysis["tipologia_destacada"], max_lines=7)
+        fig, ax = _elite_pdf_page("Recomendaciones tácticas", "Síntesis final accionable", 6, total_pages)
+        _elite_pdf_text_panel(ax, 0.07, 0.52, 0.40, 0.24, "Prioridad 1 - Tipología rival", analysis["tipologia_destacada"], max_lines=7)
         _elite_pdf_text_panel(ax, 0.53, 0.52, 0.40, 0.24, "Prioridad 2 - Bloque defensivo", analysis["estructura_defensiva"], max_lines=7)
-        _elite_pdf_text_panel(ax, 0.07, 0.265, 0.40, 0.20, "Prioridad 3 - Secuencias criticas", analysis["secuencias_criticas"], max_lines=5)
+        _elite_pdf_text_panel(ax, 0.07, 0.265, 0.40, 0.20, "Prioridad 3 - Secuencias críticas", analysis["secuencias_críticas"], max_lines=5)
         _elite_pdf_text_panel(ax, 0.53, 0.265, 0.40, 0.20, "Prioridad 4 - Momentum", analysis["momentum_critico"], max_lines=5)
         _elite_pdf_text_panel(ax, 0.07, 0.075, 0.86, 0.14, "Plan de trabajo global", analysis["recomendaciones_globales"], max_lines=4)
         pdf.savefig(fig)
@@ -11234,7 +11236,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
     metrics = payload.get("metricas_globales", {})
     executive = payload.get("resumen_ejecutivo", {})
     critical_typology = _local_report_typology(payload)
-    critical_sequences = _report_records_df(payload, "secuencias_criticas")
+    critical_sequences = _report_records_df(payload, "secuencias_críticas")
     top_idd = _report_records_df(payload, "secuencias_top_idd")
     causes = pd.DataFrame(payload.get("causas_defensivas", []))
     ctx = _match_report_context(match_id, meta)
@@ -11246,7 +11248,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
     total_pages = 5
 
     with PdfPages(buffer) as pdf:
-        fig, ax = _elite_pdf_page(f"Informe tactico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
+        fig, ax = _elite_pdf_page(f"Informe táctico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
         ax.text(0.07, 0.77, f"{teams['home_name']}  {score}  {teams['away_name']}", transform=ax.transAxes, fontsize=16, weight="bold", color=PDF_INK)
         kpis = [
             ("Secuencias", metrics.get("secuencias_rivales")),
@@ -11254,7 +11256,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
             ("IDD medio", metrics.get("ddi_medio")),
             ("IPO medio", metrics.get("ipar_medio")),
             ("Alta amenaza", metrics.get("secuencias_alta_amenaza")),
-            ("Zona daÃ±ada", metrics.get("zona_mas_danada")),
+            ("Zona dañada", metrics.get("zona_mas_danada")),
         ]
         for idx, (label, value) in enumerate(kpis):
             _elite_metric_card(ax, 0.07 + (idx % 3) * 0.30, 0.58 - (idx // 3) * 0.115, 0.26, 0.085, label, value)
@@ -11262,9 +11264,9 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Tipologia mas daÃ±ina", "Patron rival con mayor IPO medio", 2, total_pages)
+        fig, ax = _elite_pdf_page("Tipología más dañina", "Patrón rival con mayor IPO medio", 2, total_pages)
         typo_cards = [
-            ("Tipologia", critical_typology.get("tipologia", "-")),
+            ("Tipología", critical_typology.get("tipologia", "-")),
             ("Secuencias", critical_typology.get("secuencias", "-")),
             ("IDD medio", critical_typology.get("ddi_medio", "-")),
             ("Tiros", critical_typology.get("tiros", "-")),
@@ -11276,7 +11278,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
             ax,
             pd.DataFrame(payload.get("tipologias", [])),
             ["tipologia", "secuencias", "ddi_medio", "ipar_medio", "tiros", "tiros_puerta"],
-            ["Tipologia", "N", "IDD", "IPO", "Tiros", "A puerta"],
+            ["Tipología", "N", "IDD", "IPO", "Tiros", "A puerta"],
             [0.07, 0.33, 0.86, 0.16],
             max_rows=5,
         )
@@ -11285,11 +11287,11 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
         plt.close(fig)
 
         fig, ax = _elite_pdf_page("Estructura defensiva", "Situacion asociada a la secuencia prioritaria", 3, total_pages)
-        top_seq = payload.get("secuencias_criticas", [{}])[0] if payload.get("secuencias_criticas") else {}
+        top_seq = payload.get("secuencias_críticas", [{}])[0] if payload.get("secuencias_críticas") else {}
         structure_cards = [
             ("Secuencia", top_seq.get("secuencia_rival_id", "-")),
             ("Minuto", top_seq.get("minuto_partido", "-")),
-            ("Tipologia", top_seq.get("tipologia", "-")),
+            ("Tipología", top_seq.get("tipologia", "-")),
             ("IDD", top_seq.get("indice_desorganizacion", "-")),
             ("IPO", top_seq.get("indice_peligrosidad_accion", "-")),
             ("Causa", top_seq.get("causa_tactica", "-")),
@@ -11301,7 +11303,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
             ax,
             top_idd,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_desorganizacion", "indice_peligrosidad_accion"],
-            ["ID", "Min", "Tipologia", "IDD", "IPO"],
+            ["ID", "Min", "Tipología", "IDD", "IPO"],
             [0.53, 0.36, 0.40, 0.13],
             max_rows=5,
         )
@@ -11309,25 +11311,25 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Secuencias criticas", "Acciones que conviene revisar primero", 4, total_pages)
+        fig, ax = _elite_pdf_page("Secuencias críticas", "Acciones que conviene revisar primero", 4, total_pages)
         _elite_pdf_table(
             ax,
             critical_sequences,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "score_critico", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max"],
-            ["ID", "Min", "Tipologia", "Prior.", "IDD", "IPO", "xT"],
+            ["ID", "Min", "Tipología", "Prior.", "IDD", "IPO", "xT"],
             [0.07, 0.48, 0.86, 0.28],
             max_rows=6,
         )
-        _elite_pdf_text_panel(ax, 0.07, 0.17, 0.86, 0.23, "Lectura de acciones prioritarias", analysis["secuencias_criticas"], max_lines=8)
+        _elite_pdf_text_panel(ax, 0.07, 0.17, 0.86, 0.23, "Lectura de acciones prioritarias", analysis["secuencias_críticas"], max_lines=8)
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Recomendaciones tacticas", "Puntos de mejora para el cuerpo tecnico", 5, total_pages)
+        fig, ax = _elite_pdf_page("Recomendaciones tácticas", "Puntos de mejora para el cuerpo técnico", 5, total_pages)
         _elite_pdf_text_panel(ax, 0.07, 0.58, 0.40, 0.20, "Ajuste sobre tipologia", analysis["tipologia_destacada"], max_lines=6)
         _elite_pdf_text_panel(ax, 0.53, 0.58, 0.40, 0.20, "Ajuste estructural", analysis["estructura_defensiva"], max_lines=6)
-        _elite_pdf_text_panel(ax, 0.07, 0.32, 0.40, 0.18, "Revision de video", analysis["secuencias_criticas"], max_lines=5)
+        _elite_pdf_text_panel(ax, 0.07, 0.32, 0.40, 0.18, "Revision de video", analysis["secuencias_críticas"], max_lines=5)
         _elite_pdf_text_panel(ax, 0.53, 0.32, 0.40, 0.18, "Plan de mejora", analysis["recomendaciones_globales"], max_lines=5)
-        _elite_pdf_text_panel(ax, 0.07, 0.10, 0.86, 0.15, "Sintesis", analysis["recomendaciones_globales"], max_lines=4)
+        _elite_pdf_text_panel(ax, 0.07, 0.10, 0.86, 0.15, "Síntesis", analysis["recomendaciones_globales"], max_lines=4)
         pdf.savefig(fig)
         plt.close(fig)
 
@@ -11377,7 +11379,7 @@ def _report_card_grid(items: list[tuple[str, object]], cols: int = 4):
 def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[str, str]) -> bytes:
     metrics = payload.get("metricas_globales", {})
     critical_typology = _local_report_typology(payload)
-    critical_sequences = _report_records_df(payload, "secuencias_criticas")
+    critical_sequences = _report_records_df(payload, "secuencias_críticas")
     seq, clusters, _, _ = _prepare_app_data(match_id, meta)
     typology_ctx = _critical_typology_context(seq, clusters, critical_typology)
     ctx = _match_report_context(match_id, meta)
@@ -11389,7 +11391,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
     total_pages = 5
 
     with PdfPages(buffer) as pdf:
-        fig, ax = _elite_pdf_page(f"Informe tactico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
+        fig, ax = _elite_pdf_page(f"Informe táctico | Partido {match_id}", f"{ctx['fecha']} | {ctx['competicion']}", 1, total_pages)
         ax.text(0.07, 0.77, f"{teams['home_name']}  {score}  {teams['away_name']}", transform=ax.transAxes, fontsize=16, weight="bold", color=PDF_INK)
         cards = [
             ("Secuencias rivales", metrics.get("secuencias_rivales", "-")),
@@ -11400,7 +11402,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
         for idx, (label, value) in enumerate(cards):
             _elite_metric_card(ax, 0.07 + (idx % 2) * 0.46, 0.57 - (idx // 2) * 0.12, 0.40, 0.09, label, value)
         summary = (
-            f"El rival genero {metrics.get('secuencias_rivales', '-')} secuencias ofensivas, "
+            f"El rival generó {metrics.get('secuencias_rivales', '-')} secuencias ofensivas, "
             f"{metrics.get('tiros', '-')} tiros, {metrics.get('tiros_puerta', '-')} a puerta "
             f"y {metrics.get('goles', '-')} goles dentro de las acciones analizadas."
         )
@@ -11408,25 +11410,25 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Tipologia mas danina", "Patron rival con mayor IPO medio", 2, total_pages)
+        fig, ax = _elite_pdf_page("Tipología más dañina", "Patrón rival con mayor IPO medio", 2, total_pages)
         typo_cards = [
-            ("Tipologia", critical_typology.get("tipologia", "-")),
+            ("Tipología", critical_typology.get("tipologia", "-")),
             ("Causa principal", typology_ctx["causa"]),
         ]
         for idx, (label, value) in enumerate(typo_cards):
             _elite_metric_card(ax, 0.07 + (idx % 2) * 0.46, 0.62 - (idx // 2) * 0.12, 0.40, 0.09, label, value)
         typo_text = (
-            f"La tipologia con mayor dano medio fue {critical_typology.get('tipologia', '-')}. "
-            f"Ataco principalmente {typology_ctx['zona']} por {typology_ctx['carril']} y su causa defensiva dominante fue {typology_ctx['causa']}."
+            f"La tipologia con mayor daño medio fue {critical_typology.get('tipologia', '-')}. "
+            f"Atacó principalmente {typology_ctx['zona']} por {typology_ctx['carril']} y su causa defensiva dominante fue {typology_ctx['causa']}."
         )
         _elite_pdf_text_panel(ax, 0.07, 0.19, 0.86, 0.22, "Lectura", typo_text, max_lines=6)
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Estructura y secuencias criticas", "KPIs asociados y acciones prioritarias", 3, total_pages)
+        fig, ax = _elite_pdf_page("Estructura y secuencias críticas", "KPIs asociados y acciones prioritarias", 3, total_pages)
         struct_cards = [
             ("IDD medio", critical_typology.get("ddi_medio", "-")),
-            ("xT maximo", critical_typology.get("xt_max", "-")),
+            ("xT máximo", critical_typology.get("xt_max", "-")),
             ("Pitch control rival", critical_typology.get("pc_rival_medio", "-")),
         ]
         for idx, (label, value) in enumerate(struct_cards):
@@ -11435,7 +11437,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
             ax,
             critical_sequences,
             ["secuencia_rival_id", "minuto_partido", "tipologia", "indice_desorganizacion", "indice_peligrosidad_accion", "xT_max", "causa_tactica"],
-            ["ID", "Min", "Tipologia", "IDD", "IPO", "xT", "Causa"],
+            ["ID", "Min", "Tipología", "IDD", "IPO", "xT", "Causa"],
             [0.07, 0.28, 0.86, 0.20],
             font_size=6.8,
             max_rows=6,
@@ -11444,11 +11446,11 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Momentum defensivo", "Tramo de mayor presion rival acumulada", 4, total_pages)
+        fig, ax = _elite_pdf_page("Momentum defensivo", "Tramo de mayor presión rival acumulada", 4, total_pages)
         momentum = payload.get("momentum_critico", {})
         momentum_cards = [
             ("Tramo", momentum.get("tramo", "-")),
-            ("Indice temporal", momentum.get("indice_temporal", "-")),
+            ("Índice temporal", momentum.get("indice_temporal", "-")),
             ("Secuencias", momentum.get("secuencias", "-")),
             ("Tiros", momentum.get("tiros", "-")),
             ("IDD medio", momentum.get("idd_medio", "-")),
@@ -11460,7 +11462,7 @@ def _local_report_pdf(match_id: int, meta: dict, payload: dict, analysis: dict[s
         pdf.savefig(fig)
         plt.close(fig)
 
-        fig, ax = _elite_pdf_page("Recomendaciones tacticas", "Sintesis final accionable", 5, total_pages)
+        fig, ax = _elite_pdf_page("Recomendaciones tácticas", "Síntesis final accionable", 5, total_pages)
         _elite_pdf_text_panel(ax, 0.07, 0.45, 0.86, 0.30, "Puntos de mejora", analysis["recomendaciones_globales"], max_lines=9)
         _elite_pdf_text_panel(ax, 0.07, 0.16, 0.86, 0.20, "Foco de trabajo", analysis["estructura_defensiva"], max_lines=6)
         pdf.savefig(fig)
@@ -11474,27 +11476,27 @@ def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
         "Informe local del partido",
-        "Lectura determinista en la propia pagina: KPIs, tipologia mas daÃ±ina, estructura defensiva, secuencias criticas y recomendaciones tacticas.",
+        "Lectura determinista en la propia página: KPIs, tipologia más dañina, estructura defensiva, secuencias críticas y recomendaciones tácticas.",
     )
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
         st.warning(payload["error"])
         return
 
-    analysis = _coach_report_fallback(payload)
+    analysis = {key: _display_text(value) for key, value in _coach_report_fallback(payload).items()}
     metrics = payload.get("metricas_globales", {})
     executive = payload.get("resumen_ejecutivo", {})
     critical_typology = _local_report_typology(payload)
-    critical_sequences = _report_records_df(payload, "secuencias_criticas")
-    top_seq = payload.get("secuencias_criticas", [{}])[0] if payload.get("secuencias_criticas") else {}
+    critical_sequences = _report_records_df(payload, "secuencias_críticas")
+    top_seq = payload.get("secuencias_críticas", [{}])[0] if payload.get("secuencias_críticas") else {}
 
     _subsection_heading("1. KPIs principales")
     _report_metric_grid(metrics, executive)
     st.markdown(analysis["resumen_ejecutivo"])
 
-    _subsection_heading("2. Tipologia mas daÃ±ina")
+    _subsection_heading("2. Tipología más dañina")
     c1, c2, c3 = st.columns(3)
-    c1.metric("Tipologia", critical_typology.get("tipologia", "-"))
+    c1.metric("Tipología", critical_typology.get("tipologia", "-"))
     c3.metric("IDD medio", critical_typology.get("ddi_medio", "-"))
     typo_df = pd.DataFrame(payload.get("tipologias", []))
     if not typo_df.empty:
@@ -11513,7 +11515,7 @@ def render_informe(match_id: int, meta: dict):
     cols[2].metric("Causa principal", top_seq.get("causa_tactica", "-"))
     st.markdown(analysis["estructura_defensiva"])
 
-    _subsection_heading("4. Secuencias mas criticas")
+    _subsection_heading("4. Secuencias más críticas")
     if not critical_sequences.empty:
         table_cols = [
             "secuencia_rival_id",
@@ -11526,16 +11528,16 @@ def render_informe(match_id: int, meta: dict):
             "causa_tactica",
         ]
         st.dataframe(critical_sequences[[c for c in table_cols if c in critical_sequences.columns]].head(8), use_container_width=True, hide_index=True)
-    st.markdown(analysis["secuencias_criticas"])
+    st.markdown(analysis["secuencias_críticas"])
 
-    _subsection_heading("5. Recomendaciones tacticas")
+    _subsection_heading("5. Recomendaciones tácticas")
     st.markdown(analysis["recomendaciones_globales"])
 
     pdf_bytes = _local_report_pdf(match_id, meta, payload, analysis)
     st.download_button(
         "Exportar este informe a PDF",
         data=pdf_bytes,
-        file_name=f"informe_tactico_{match_id}.pdf",
+        file_name=f"informe_táctico_{match_id}.pdf",
         mime="application/pdf",
         type="primary",
         use_container_width=True,
@@ -11546,39 +11548,39 @@ def render_informe(match_id: int, meta: dict):
     _page_heading("Informe")
     _section_intro(
         "Informe local del partido",
-        "Lectura determinista en la propia pagina: KPIs, tipologia mas danina, estructura defensiva, secuencias criticas, momentum y recomendaciones tacticas.",
+        "Lectura determinista en la propia página: KPIs, tipologia más dañina, estructura defensiva, secuencias críticas, momentum y recomendaciones tácticas.",
     )
     payload = _report_payload(match_id, meta)
     if payload.get("error"):
         st.warning(payload["error"])
         return
 
-    analysis = _coach_report_fallback(payload)
+    analysis = {key: _display_text(value) for key, value in _coach_report_fallback(payload).items()}
     metrics = payload.get("metricas_globales", {})
     executive = payload.get("resumen_ejecutivo", {})
     critical_typology = _local_report_typology(payload)
-    critical_sequences = _report_records_df(payload, "secuencias_criticas")
+    critical_sequences = _report_records_df(payload, "secuencias_críticas")
     seq, clusters, _, _ = _prepare_app_data(match_id, meta)
     typology_ctx = _critical_typology_context(seq, clusters, critical_typology)
 
     _subsection_heading("1. KPIs principales")
     _report_metric_grid(metrics, executive)
     st.markdown(
-        f"El rival genero **{metrics.get('secuencias_rivales', '-')} secuencias ofensivas**, "
+        f"El rival generó **{metrics.get('secuencias_rivales', '-')} secuencias ofensivas**, "
         f"con **{metrics.get('tiros', '-')} tiros**, **{metrics.get('tiros_puerta', '-')} a puerta** "
         f"y **{metrics.get('goles', '-')} goles** dentro de las acciones analizadas."
     )
 
-    _subsection_heading("2. Tipologia mas danina")
+    _subsection_heading("2. Tipología más dañina")
     _report_card_grid(
         [
-            ("Tipologia", critical_typology.get("tipologia", "-")),
+            ("Tipología", critical_typology.get("tipologia", "-")),
             ("Causa principal", typology_ctx["causa"]),
         ],
         cols=2,
     )
     st.markdown(
-        f"La tipologia con mayor dano medio fue **{critical_typology.get('tipologia', '-')}**. "
+        f"La tipologia con mayor daño medio fue **{critical_typology.get('tipologia', '-')}**. "
         f"Su foco principal aparece en **{typology_ctx['zona']}** por **{typology_ctx['carril']}**, "
         f"con causa defensiva dominante: **{typology_ctx['causa']}**."
     )
@@ -11588,19 +11590,19 @@ def render_informe(match_id: int, meta: dict):
         [
             ("IDD medio", critical_typology.get("ddi_medio", "-")),
             ("IPO medio", critical_typology.get("ipar_medio", "-")),
-            ("xT maximo", critical_typology.get("xt_max", "-")),
+            ("xT máximo", critical_typology.get("xt_max", "-")),
             ("Pitch control rival", critical_typology.get("pc_rival_medio", "-")),
         ],
         cols=4,
     )
     st.markdown(analysis["estructura_defensiva"])
 
-    _subsection_heading("4. Secuencias mas criticas")
+    _subsection_heading("4. Secuencias más críticas")
     if not critical_sequences.empty:
         _show_static_table(_sequence_display_table(critical_sequences, n=8))
     st.markdown(
         "Estas son las acciones que conviene detener y revisar en video, porque combinan peligro ofensivo, "
-        "desorganizacion y prioridad tactica."
+        "desorganización y prioridad tactica."
     )
 
     _subsection_heading("5. Momentum defensivo")
@@ -11614,14 +11616,14 @@ def render_informe(match_id: int, meta: dict):
     except Exception:
         st.info("No hay ventanas temporales suficientes para calcular momentum.")
 
-    _subsection_heading("6. Recomendaciones tacticas")
+    _subsection_heading("6. Recomendaciones tácticas")
     st.markdown(analysis["recomendaciones_globales"])
 
     pdf_bytes = _local_report_pdf(match_id, meta, payload, analysis)
     st.download_button(
         "Exportar este informe a PDF",
         data=pdf_bytes,
-        file_name=f"informe_tactico_{match_id}.pdf",
+        file_name=f"informe_táctico_{match_id}.pdf",
         mime="application/pdf",
         type="primary",
         use_container_width=True,
@@ -11658,15 +11660,15 @@ def main():
         render_topbar(team)
         team_name = _team_display_name(team)
         st.markdown(
-            f'<div class="app-breadcrumb">MenÃº principal / <b>{html.escape(team_name)}</b></div>',
+            f'<div class="app-breadcrumb">Menú principal / <b>{html.escape(team_name)}</b></div>',
             unsafe_allow_html=True,
         )
         render_club_home(team)
     elif view == "analysis":
         team = _team_by_id(st.session_state.get("selected_team_id"))
         if not _can_access_team(int(team["team_id"])):
-            _audit_action("acceso_bloqueado_analisis", f"team_id={int(team['team_id'])}")
-            st.warning("Tu usuario no tiene permiso para acceder a este analisis.")
+            _audit_action("acceso_bloqueado_análisis", f"team_id={int(team['team_id'])}")
+            st.warning("Tu usuario no tiene permiso para acceder a este análisis.")
             st.session_state["app_view"] = "portal"
             st.rerun()
         match_id = st.session_state.get("selected_match_id")
@@ -11687,4 +11689,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
