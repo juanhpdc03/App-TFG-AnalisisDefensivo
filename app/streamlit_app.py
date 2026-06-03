@@ -6302,7 +6302,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
       </div>
       <div id="bepro-sequence-status" style="color:#cbd2df;font-size:12px;margin-top:7px;">Cargando secuencia...</div>
     </div>
-    <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.6.16/dist/hls.min.js"></script>
     <script>
       const video = document.getElementById("bepro-sequence-player");
       const stage = document.getElementById("video-stage");
@@ -6578,12 +6578,17 @@ def _render_sequence_player(match_id: int, row: pd.Series):
         if (!playToggle) return;
         playToggle.innerHTML = video.paused ? "&#9654;" : "&#10074;&#10074;";
       }}
+      function setStatus(message) {{
+        if (status) {{
+          status.textContent = message;
+        }}
+      }}
       function playSequence() {{
         if (video.currentTime < start || video.currentTime >= end) {{
           video.currentTime = start;
         }}
         video.play().then(syncPlaybackButton).catch(() => {{
-          status.textContent = "Pulsa Reproducir si el navegador bloquea la reproduccion automatica.";
+          setStatus("Pulsa Reproducir si el navegador bloquea la reproduccion automatica.");
           syncPlaybackButton();
         }});
       }}
@@ -6708,9 +6713,9 @@ def _render_sequence_player(match_id: int, row: pd.Series):
         if (video.currentTime >= end) {{
           pauseSequence();
           video.currentTime = start;
-          status.textContent = "Secuencia terminada. Pulsa Ver de nuevo para repetirla.";
+          setStatus("Secuencia terminada. Pulsa Ver de nuevo para repetirla.");
         }} else {{
-          status.textContent = "Reproduciendo " + Math.floor(video.currentTime) + "s / fin " + Math.floor(end) + "s";
+          setStatus("Reproduciendo " + Math.floor(video.currentTime) + "s / fin " + Math.floor(end) + "s");
         }}
         drawMinimap();
       }}
@@ -6722,16 +6727,75 @@ def _render_sequence_player(match_id: int, row: pd.Series):
         }}
       }}
 
-      if (window.Hls && Hls.isSupported()) {{
-        const hls = new Hls({{ startPosition: start }});
+      let playerStarted = false;
+      const loadingTimer = window.setTimeout(() => {{
+        if (!playerStarted) {{
+          setStatus("El video tarda mas de lo normal en cargar. Pulsa Reproducir o abre de nuevo la secuencia.");
+        }}
+      }}, 9000);
+
+      function markStarted(message) {{
+        playerStarted = true;
+        window.clearTimeout(loadingTimer);
+        if (message) setStatus(message);
+      }}
+
+      function initNativeHls() {{
+        if (!video.canPlayType("application/vnd.apple.mpegurl")) {{
+          setStatus("Este navegador no puede reproducir HLS directamente.");
+          return false;
+        }}
+        video.src = source;
+        video.addEventListener("loadedmetadata", () => {{
+          markStarted("Video cargado. Reproduciendo secuencia...");
+          playFromStart();
+        }}, {{ once: true }});
+        video.addEventListener("error", () => {{
+          setStatus("No se ha podido cargar el video HLS directo desde BePro.");
+        }}, {{ once: true }});
+        return true;
+      }}
+
+      function initHlsJs() {{
+        if (!(window.Hls && Hls.isSupported())) {{
+          return initNativeHls();
+        }}
+        const hls = new Hls({{
+          startPosition: start,
+          maxBufferLength: 45,
+          backBufferLength: 15,
+          enableWorker: true
+        }});
         hls.loadSource(source);
         hls.attachMedia(video);
-        hls.on(Hls.Events.MANIFEST_PARSED, playFromStart);
-      }} else if (video.canPlayType("application/vnd.apple.mpegurl")) {{
-        video.src = source;
-        video.addEventListener("loadedmetadata", playFromStart, {{ once: true }});
+        hls.on(Hls.Events.MANIFEST_PARSED, () => {{
+          markStarted("Video cargado. Reproduciendo secuencia...");
+          playFromStart();
+        }});
+        hls.on(Hls.Events.ERROR, (_event, data) => {{
+          const details = data && data.details ? String(data.details) : "error desconocido";
+          if (data && data.fatal) {{
+            if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {{
+              setStatus("Error de red cargando el video BePro. Reintentando...");
+              hls.startLoad(start);
+            }} else if (data.type === Hls.ErrorTypes.MEDIA_ERROR) {{
+              setStatus("Error de reproduccion del video. Intentando recuperar...");
+              hls.recoverMediaError();
+            }} else {{
+              hls.destroy();
+              if (!initNativeHls()) {{
+                setStatus("No se ha podido reproducir el video BePro: " + details);
+              }}
+            }}
+          }} else if (!playerStarted) {{
+            setStatus("Cargando video BePro... " + details);
+          }}
+        }});
+      }}
+      if (document.readyState === "loading") {{
+        document.addEventListener("DOMContentLoaded", initHlsJs, {{ once: true }});
       }} else {{
-        status.textContent = "Este navegador no puede reproducir HLS directamente.";
+        initHlsJs();
       }}
       video.addEventListener("timeupdate", monitorEnd);
       video.addEventListener("play", () => {{
@@ -6744,7 +6808,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
       }});
       video.addEventListener("seeking", () => {{
         if (video.currentTime < start || video.currentTime > end) {{
-          status.textContent = "Tramo objetivo: " + Math.floor(start) + "s - " + Math.floor(end) + "s";
+          setStatus("Tramo objetivo: " + Math.floor(start) + "s - " + Math.floor(end) + "s");
         }}
         drawMinimap();
       }});
