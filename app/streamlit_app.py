@@ -6620,7 +6620,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
       }}
       stage.addEventListener("wheel", (event) => {{
         event.preventDefault();
-        const delta = event.deltaY < 0  0.12 : -0.12;
+        const delta = event.deltaY < 0 ? 0.12 : -0.12;
         setZoom(zoom + delta);
       }}, {{ passive: false }});
       stage.addEventListener("pointerdown", (event) => {{
