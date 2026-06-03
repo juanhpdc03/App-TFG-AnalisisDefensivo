@@ -6338,7 +6338,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
       const minimapBox = document.getElementById("xt-minimap");
       const minimapCanvas = document.getElementById("xt-minimap-canvas");
       const minimapValue = document.getElementById("xt-minimap-value");
-      const minimapCtx = minimapCanvas  minimapCanvas.getContext("2d") : null;
+      const minimapCtx = minimapCanvas ? minimapCanvas.getContext("2d") : null;
       let minimapReady = !!(minimap && minimap.points && minimap.points.length > 1 && minimap.grid);
       if (!minimapReady && minimapBox) {{
         minimapBox.style.display = "none";
@@ -6658,7 +6658,7 @@ def _render_sequence_player(match_id: int, row: pd.Series):
         ["pointerdown", "pointermove", "pointerup", "click", "dblclick", "wheel"].forEach((eventName) => {{
           controlBar.addEventListener(eventName, (event) => {{
             event.stopPropagation();
-          }}, {{ passive: eventName === "wheel"  false : true }});
+          }}, {{ passive: eventName === "wheel" ? false : true }});
         }});
       }}
       playToggle.addEventListener("click", () => {{
